@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Navbar from './components/Navbar';
 import WeatherHeader from './components/WeatherHeader';
 import UrbanPanel from './components/UrbanPanel';
@@ -8,11 +8,11 @@ import DailyForecastCards from './components/DailyForecastCards';
 import ForecastChart from './components/ForecastChart';
 import ComparisonTable from './components/ComparisonTable';
 import SatelliteModal from './components/SatelliteModal';
+import BottomNav from './components/BottomNav';
 
 const API_BASE = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ? 'http://localhost:8000'
   : '';
-
 
 export default function App() {
   const [modo, setModo] = useState('urbano');
@@ -20,6 +20,10 @@ export default function App() {
   const [climaData, setClimaData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sateliteModalOpen, setSateliteModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('inicio');
+
+  const mapRef = useRef(null);
+  const forecastRef = useRef(null);
 
   // Obtener geolocalización GPS del usuario al iniciar
   useEffect(() => {
@@ -28,7 +32,8 @@ export default function App() {
         (pos) => {
           setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude });
         },
-        (err) => console.log("Geolocalización predeterminada (Santiago):", err)
+        (err) => console.log("Geolocalización predeterminada (Santiago):", err),
+        { timeout: 8000, enableHighAccuracy: true }
       );
     }
   }, []);
@@ -44,6 +49,24 @@ export default function App() {
       .catch((err) => console.error("Error consultando clima:", err))
       .finally(() => setLoading(false));
   }, [coords]);
+
+  // Manejo de navegación por pestañas inferiores (BottomNav)
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    if (tabId === 'inicio') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (tabId === 'mapa') {
+      if (mapRef.current) {
+        mapRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+    } else if (tabId === 'satelite') {
+      setSateliteModalOpen(true);
+    } else if (tabId === 'pronostico') {
+      if (forecastRef.current) {
+        forecastRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  };
 
   const handleSelectStation = (est) => {
     if (est.lat && est.lon) {
@@ -62,8 +85,8 @@ export default function App() {
         apiBase={API_BASE}
       />
 
-      {/* CONTENIDO PRINCIPAL COMPLETO */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+      {/* CONTENIDO PRINCIPAL COMPLETO CON SAFE AREA FOOTER PADDING */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6 pb-24 md:pb-8">
         
         {loading ? (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center space-y-4 my-12 shadow-xl">
@@ -76,52 +99,63 @@ export default function App() {
             {/* CABECERA DE CLIMA E INDICADORES DE ESTACIÓN & ALERTAS SENAPRED */}
             <WeatherHeader climaData={climaData} />
 
-            {/* PANEL MODO URBANO & MODO AGRÍCOLA (RESTAURADOS AL 100%) */}
+            {/* PANEL MODO URBANO & MODO AGRÍCOLA */}
             {modo === 'urbano' ? (
               <UrbanPanel urbano={climaData?.modo_urbano} />
             ) : (
               <AgroPanel agricola={climaData?.modo_agricola} />
             )}
 
-            {/* TARJETAS DEL PRONÓSTICO A 7 DÍAS */}
-            <DailyForecastCards
-              dailyForecast={climaData?.pronostico_numerico_openmeteo?.diario_7dias}
-            />
+            {/* SECCIÓN MAPA INTERACTIVO */}
+            <div ref={mapRef}>
+              <MapSection
+                estacionSeleccionada={climaData?.estacion}
+                apiBase={API_BASE}
+                onOpenSateliteModal={() => setSateliteModalOpen(true)}
+                onSelectStation={handleSelectStation}
+              />
+            </div>
 
-            {/* VISOR INTERACTIVO SOBRE FOTO SATELITAL REAL ESRI WORLD IMAGERY */}
-            <MapSection
-              estacionSeleccionada={climaData?.estacion}
-              apiBase={API_BASE}
-              onOpenSateliteModal={() => setSateliteModalOpen(true)}
-              onSelectStation={handleSelectStation}
-            />
+            {/* SECCIÓN PRONÓSTICO Y GRÁFICO 48H */}
+            <div ref={forecastRef} className="space-y-6">
+              <DailyForecastCards
+                dailyForecast={climaData?.pronostico_numerico_openmeteo?.diario_7dias}
+              />
 
-            {/* TABLA COMPARATIVA MULTIRED (DMC VS AGROMET VS REDMETEO) */}
-            <ComparisonTable
-              estacionActual={climaData?.estacion}
-              apiBase={API_BASE}
-            />
+              <ComparisonTable
+                estacionActual={climaData?.estacion}
+                apiBase={API_BASE}
+              />
 
-            {/* PRONÓSTICO BOLETÍN DMC & CURVA HORA A HORA 48 HORAS */}
-            <ForecastChart
-              dmcForecast={climaData?.pronostico_oficial_dmc}
-              openMeteoForecast={climaData?.pronostico_numerico_openmeteo}
-            />
+              <ForecastChart
+                dmcForecast={climaData?.pronostico_oficial_dmc}
+                openMeteoForecast={climaData?.pronostico_numerico_openmeteo}
+              />
+            </div>
           </>
         )}
 
       </main>
 
       {/* PIE DE PÁGINA */}
-      <footer className="border-t border-slate-800 py-6 text-center text-xs text-slate-500 bg-slate-950">
+      <footer className="border-t border-slate-800 py-6 text-center text-xs text-slate-500 bg-slate-950 pb-20 md:pb-6">
         <p>MeteoPrecisa Chile © 2026 — Plataforma Open Source de Meteorología & Agrometeorología Nacional</p>
       </footer>
 
       {/* REPRODUCTOR SATELITAL FLUIDO GOES-19 */}
       <SatelliteModal
         isOpen={sateliteModalOpen}
-        onClose={() => setSateliteModalOpen(false)}
+        onClose={() => {
+          setSateliteModalOpen(false);
+          setActiveTab('inicio');
+        }}
         apiBase={API_BASE}
+      />
+
+      {/* NAVEGACIÓN INFERIOR TÁCTIL (BOTTOM NAV BAR MÓVIL) */}
+      <BottomNav
+        activeTab={activeTab}
+        setActiveTab={handleTabChange}
       />
 
     </div>

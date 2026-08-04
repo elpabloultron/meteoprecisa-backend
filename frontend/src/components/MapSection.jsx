@@ -197,8 +197,11 @@ export default function MapSection({ estacionSeleccionada, apiBase, onOpenSateli
           center={[centerLat, centerLon]}
           zoom={8}
           scrollWheelZoom={false}
+          dragging={!L.Browser.mobile}
+          touchZoom={true}
           className="h-full w-full"
         >
+
           <ChangeView center={[centerLat, centerLon]} />
 
           {/* BASEMAP SATELITAL ESRI WORLD IMAGERY (OPCIÓN A) */}
