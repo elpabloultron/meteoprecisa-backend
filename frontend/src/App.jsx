@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Navbar from './components/Navbar';
 import WeatherHeader from './components/WeatherHeader';
+import HourlyCarousel from './components/HourlyCarousel';
 import UrbanPanel from './components/UrbanPanel';
 import AgroPanel from './components/AgroPanel';
 import MapSection from './components/MapSection';
@@ -85,7 +86,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-blue-500 selection:text-slate-950">
+    <div className="min-h-screen bg-[#080c14] text-slate-100 flex flex-col font-sans selection:bg-sky-500 selection:text-slate-950">
       
       {/* NAVBAR NAVEGACIÓN PRINCIPAL */}
       <Navbar
@@ -99,17 +100,20 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6 pb-24 md:pb-8">
         
         {loading ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center space-y-4 my-12 shadow-xl">
-            <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-12 text-center space-y-4 my-12 shadow-2xl backdrop-blur-xl">
+            <div className="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto" />
             <div className="text-base font-bold text-white">Sincronizando telemetría en vivo para Chile...</div>
             <p className="text-xs text-slate-400">Consultando 609 estaciones físicas DMC, Agromet INIA, RedMeteo y Google Earth Engine</p>
           </div>
         ) : (
           <>
-            {/* CABECERA DE CLIMA E INDICADORES DE ESTACIÓN & ALERTAS SENAPRED */}
+            {/* CABECERA HERO ESTILO APPLE WEATHER */}
             <WeatherHeader climaData={climaData} />
 
-            {/* PANEL MODO URBANO & MODO AGRÍCOLA CON EVENTOS ONCLICK */}
+            {/* SLIDER HORA A HORA (PRÓXIMAS 24 HORAS) */}
+            <HourlyCarousel hourlyForecast={climaData?.pronostico_numerico_openmeteo?.horario} />
+
+            {/* PANEL MODO URBANO & MODO AGRÍCOLA CON CARDS INTERACTIVAS */}
             {modo === 'urbano' ? (
               <UrbanPanel
                 urbano={climaData?.modo_urbano}
@@ -156,8 +160,8 @@ export default function App() {
       </main>
 
       {/* PIE DE PÁGINA */}
-      <footer className="border-t border-slate-800 py-6 text-center text-xs text-slate-500 bg-slate-950 pb-20 md:pb-6">
-        <p>MeteoPrecisa Chile © 2026 — Plataforma Open Source de Meteorología & Agrometeorología Nacional</p>
+      <footer className="border-t border-slate-800/80 py-6 text-center text-xs text-slate-500 bg-slate-950 pb-20 md:pb-6">
+        <p>MeteoPrecisa Chile v10.2 • Plataforma de Telemetría Hiperlocal & Google Earth Engine</p>
       </footer>
 
       {/* REPRODUCTOR SATELITAL BUCLE WEBP GOES-19 */}

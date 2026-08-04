@@ -4,7 +4,7 @@ import { Sun, CloudSun, CloudRain, Snowflake, Droplets, Calendar, Sprout } from 
 export default function DailyForecastCards({ dailyForecast }) {
   if (!dailyForecast || !dailyForecast.time || dailyForecast.time.length === 0) {
     return (
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl text-center text-slate-400 text-xs">
+      <div className="glass-panel p-6 text-center text-slate-400 text-xs">
         Cargando pronóstico diario a 7 días...
       </div>
     );
@@ -19,35 +19,41 @@ export default function DailyForecastCards({ dailyForecast }) {
     uv_index_max = []
   } = dailyForecast;
 
-  const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+  // Encontrar el mínimo y máximo global para la barra de gradiente de temperatura
+  const globalMin = Math.min(...temperature_2m_min.slice(0, 7).filter(n => n !== undefined));
+  const globalMax = Math.max(...temperature_2m_max.slice(0, 7).filter(n => n !== undefined));
+  const tempRange = (globalMax - globalMin) || 1;
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+    <div className="glass-panel p-6 space-y-4 border-slate-800/80 bg-slate-900/60 backdrop-blur-2xl">
+      
+      {/* CABECERA */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
         <div className="flex items-center gap-2.5">
-          <Calendar className="w-5 h-5 text-blue-400" />
-          <h3 className="text-lg font-bold text-white">
-            Pronóstico Meteorológico & Agrometeorológico a 7 Días
+          <Calendar className="w-5 h-5 text-sky-400" />
+          <h3 className="text-base font-bold text-white">
+            Pronóstico a 7 Días
           </h3>
         </div>
-        <span className="text-xs text-blue-400 font-bold bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">
-          Oficial DMC & Open-Meteo
+        <span className="text-[11px] text-sky-400 font-bold bg-sky-500/10 px-3 py-1 rounded-full border border-sky-500/20">
+          Estacional DMC & Open-Meteo
         </span>
       </div>
 
-      {/* GRILLA DE 7 DÍAS DESTACADA */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 pt-2">
+      {/* LISTA ESTILO APPLE WEATHER DE 7 DÍAS CON BARRA DE GRADIENTE DE TEMPERATURA */}
+      <div className="space-y-2 pt-1">
         {time.slice(0, 7).map((fechaStr, idx) => {
           const dateObj = new Date(fechaStr + 'T12:00:00');
           const esHoy = idx === 0;
           const nombreDia = esHoy ? 'Hoy' : diasSemana[dateObj.getDay()];
-          const tMax = temperature_2m_max[idx] !== undefined ? Math.round(temperature_2m_max[idx]) : '--';
-          const tMin = temperature_2m_min[idx] !== undefined ? Math.round(temperature_2m_min[idx]) : '--';
+          const tMax = temperature_2m_max[idx] !== undefined ? Math.round(temperature_2m_max[idx]) : 20;
+          const tMin = temperature_2m_min[idx] !== undefined ? Math.round(temperature_2m_min[idx]) : 10;
           const rain = precipitation_sum[idx] || 0.0;
           const eto = et0_fao_evapotranspiration[idx] || 0.0;
-          const uv = uv_index_max[idx] || 0.0;
 
-          // Seleccionar icono según lluvia y temperatura
+          // Seleccionar icono según clima
           let IconComp = Sun;
           let iconColor = 'text-amber-400';
           if (rain > 1.0) {
@@ -58,63 +64,68 @@ export default function DailyForecastCards({ dailyForecast }) {
             iconColor = 'text-cyan-300';
           } else if (rain > 0.1 || tMax < 18) {
             IconComp = CloudSun;
-            iconColor = 'text-teal-300';
+            iconColor = 'text-sky-300';
           }
+
+          // Cálculo de posiciones porcentuales para la barra de temperatura estilo iOS
+          const leftPct = Math.max(0, Math.min(100, ((tMin - globalMin) / tempRange) * 100));
+          const rightPct = Math.max(0, Math.min(100, ((globalMax - tMax) / tempRange) * 100));
 
           return (
             <div
               key={fechaStr}
-              className={`p-4 rounded-xl border transition-all flex flex-col justify-between space-y-3 ${
+              className={`p-3.5 rounded-2xl flex items-center justify-between gap-4 transition duration-200 ${
                 esHoy
-                  ? 'bg-gradient-to-b from-blue-950/90 to-slate-900 border-blue-500/60 shadow-lg shadow-blue-500/20 ring-1 ring-blue-500/50'
-                  : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                  ? 'bg-gradient-to-r from-sky-950/60 to-slate-900 border border-sky-500/40'
+                  : 'bg-slate-950/40 border border-slate-800/60 hover:bg-slate-900/60'
               }`}
             >
-              {/* DIA Y FECHA */}
-              <div className="text-center">
-                <div className={`text-xs font-bold ${esHoy ? 'text-blue-300 uppercase tracking-wider' : 'text-slate-200'}`}>
+              {/* DÍA & FECHA */}
+              <div className="w-24 shrink-0">
+                <div className={`text-sm font-bold ${esHoy ? 'text-sky-300' : 'text-white'}`}>
                   {nombreDia}
                 </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">
-                  {dateObj.getDate()} / {dateObj.getMonth() + 1}
+                <div className="text-[10px] text-slate-400 font-mono">
+                  {dateObj.getDate()}/{dateObj.getMonth() + 1}
                 </div>
               </div>
 
-              {/* ICONO DEL TIEMPO */}
-              <div className="flex justify-center py-1">
-                <IconComp className={`w-9 h-9 ${iconColor}`} />
+              {/* ÍCONO Y PROBABILIDAD LLUVIA */}
+              <div className="flex items-center gap-2 w-20 shrink-0">
+                <IconComp className={`w-6 h-6 ${iconColor}`} />
+                {rain > 0 ? (
+                  <span className="text-[11px] font-bold text-sky-400 font-mono">{rain}mm</span>
+                ) : (
+                  <span className="text-[10px] text-slate-500">Seco</span>
+                )}
               </div>
 
-              {/* TEMPERATURA MÁX / MÍN */}
-              <div className="flex items-center justify-center gap-2 font-mono font-bold text-sm">
-                <span className="text-amber-400 text-base">{tMax}°C</span>
-                <span className="text-slate-600">/</span>
-                <span className="text-cyan-400 text-base">{tMin}°C</span>
+              {/* TEMPERATURA MÍNIMA */}
+              <div className="w-10 text-right font-mono font-bold text-sm text-cyan-300 shrink-0">
+                {tMin}°
               </div>
 
-              {/* MÉTRICAS SECUNDARIAS (LLUVIA & ETo) */}
-              <div className="pt-2 border-t border-slate-800/80 space-y-1 text-[11px]">
-                <div className="flex items-center justify-between text-slate-300">
-                  <span className="flex items-center gap-1 text-blue-400">
-                    <Droplets className="w-3 h-3" />
-                    Lluvia:
-                  </span>
-                  <span className="font-mono font-bold">{rain} mm</span>
-                </div>
+              {/* BARRA DE GRADIENTE DE TEMPERATURA RANGO SEMANAL */}
+              <div className="flex-1 hidden sm:block h-2 bg-slate-800/80 rounded-full relative overflow-hidden">
+                <div
+                  className="absolute top-0 bottom-0 rounded-full bg-gradient-to-r from-cyan-400 via-emerald-400 to-amber-400"
+                  style={{
+                    left: `${leftPct}%`,
+                    right: `${rightPct}%`
+                  }}
+                />
+              </div>
 
-                <div className="flex items-center justify-between text-slate-300">
-                  <span className="flex items-center gap-1 text-emerald-400">
-                    <Sprout className="w-3 h-3" />
-                    ETo:
-                  </span>
-                  <span className="font-mono font-bold">{eto} mm</span>
-                </div>
+              {/* TEMPERATURA MÁXIMA */}
+              <div className="w-10 text-left font-mono font-bold text-sm text-amber-300 shrink-0">
+                {tMax}°
               </div>
 
             </div>
           );
         })}
       </div>
+
     </div>
   );
 }
