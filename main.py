@@ -255,11 +255,15 @@ def home():
         "total_estaciones_registradas": len(CACHE_MEMORIA.get("catalogo_estaciones", []))
     }
 
+@app.get("/")
 @app.get("/app")
 @app.get("/app/")
 @app.get("/index.html")
 async def app_frontend():
     index_path = os.path.join(SERVE_DIR, "index.html")
+    if not os.path.exists(index_path):
+        index_path = os.path.join(STATIC_DIR, "index.html")
+
     if os.path.exists(index_path):
         return FileResponse(
             index_path,
@@ -269,7 +273,8 @@ async def app_frontend():
                 "Expires": "0"
             }
         )
-    return RedirectResponse(url="/")
+    return {"status": "online", "message": "MeteoPrecisa Engine"}
+
 
 
 @app.get("/api/v1/capas-mapa")
