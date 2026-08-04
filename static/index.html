@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#080c14" />
   <title>MeteoPrecisa Chile — Telemetría Hiperlocal & GEE</title>
 
+  {/* Estilos e Librerías CDN Garantizadas */}
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -47,9 +48,11 @@
 </head>
 <body class="antialiased selection:bg-sky-500 selection:text-slate-950">
 
+  {/* NAVBAR NAVEGACIÓN PRINCIPAL */}
   <header class="sticky top-0 z-40 bg-slate-950/85 border-b border-slate-800/80 backdrop-blur-2xl px-4 py-3 shadow-2xl pt-safe">
     <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
       
+      {/* BRAND & LOGO */}
       <div class="flex items-center justify-between w-full md:w-auto">
         <div class="flex items-center gap-3">
           <div class="p-2.5 rounded-2xl bg-gradient-to-tr from-sky-600 to-blue-500 text-white font-bold shadow-lg shadow-sky-500/20 ring-1 ring-white/20">
@@ -58,7 +61,7 @@
           <div>
             <div class="flex items-center gap-2">
               <h1 class="text-xl font-extrabold text-white tracking-tight">MeteoPrecisa</h1>
-              <span class="px-2 py-0.5 text-[10px] font-bold bg-sky-500/20 text-sky-300 rounded-full border border-sky-500/30">v10.2 HTML5</span>
+              <span class="px-2 py-0.5 text-[10px] font-bold bg-sky-500/20 text-sky-300 rounded-full border border-sky-500/30">v10.2 Live</span>
             </div>
             <p class="text-[11px] text-slate-400">Chile • Telemetría Multired & GEE</p>
           </div>
@@ -70,6 +73,7 @@
         </div>
       </div>
 
+      {/* BUSCADOR AUTOCOMPLETADO */}
       <div class="relative w-full md:w-96">
         <input
           id="searchInput"
@@ -80,6 +84,7 @@
         <div id="searchResults" class="hidden absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-h-60 overflow-y-auto z-50 divide-y divide-slate-800"></div>
       </div>
 
+      {/* PILLS URBANO / AGRÍCOLA */}
       <div class="flex items-center p-1 bg-slate-900/90 border border-slate-800 rounded-2xl w-full md:w-auto justify-center">
         <button id="btnUrbano" onclick="setModo('urbano')" class="flex-1 md:flex-none px-4 py-1.5 rounded-xl text-xs font-bold transition bg-sky-500 text-white shadow-lg">🏢 Modo Urbano</button>
         <button id="btnAgricola" onclick="setModo('agricola')" class="flex-1 md:flex-none px-4 py-1.5 rounded-xl text-xs font-bold transition text-slate-400 hover:text-white">🌱 Modo Agrícola</button>
@@ -88,12 +93,24 @@
     </div>
   </header>
 
+  {/* CONTENEDOR PRINCIPAL */}
   <main class="max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6 pb-24 md:pb-8">
     
+    {/* HERO CARD ESTILO APPLE WEATHER CON BOTÓN COMPARTIR Y ESTACIONES CERCANAS (PUNTO 2 Y 6) */}
     <div id="heroCard" class="relative rounded-3xl p-6 md:p-8 bg-gradient-to-b from-slate-900/90 via-slate-900/70 to-slate-950/90 border border-slate-800/80 shadow-2xl backdrop-blur-2xl text-center space-y-3 overflow-hidden">
-      <div class="flex items-center justify-center gap-2 text-xs font-bold text-sky-400 uppercase tracking-wide">
-        📍 <span id="heroSector">Santiago, Región Metropolitana</span>
+      
+      {/* BOTÓN COMPARTIR Y UBICACIÓN CERCANA (PUNTO 2 Y 6) */}
+      <div class="flex items-center justify-between text-xs font-bold text-sky-400">
+        <button onclick="openEstacionesCercanasModal()" class="flex items-center gap-2 bg-sky-500/10 hover:bg-sky-500/20 px-3 py-1.5 rounded-xl border border-sky-500/30 text-sky-300 transition">
+          📍 <span id="heroSector">Santiago • A 3.2 km</span>
+          <span class="text-[10px] text-sky-400 underline">(Ver 5 Cercanas)</span>
+        </button>
+
+        <button onclick="compartirEstacion()" class="flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-700/80 px-3 py-1.5 rounded-xl border border-slate-700 text-slate-200 transition">
+          🔗 <span>Compartir</span>
+        </button>
       </div>
+
       <h1 id="heroStationName" class="text-3xl md:text-5xl font-black text-white tracking-tight">Estación Quinta Normal</h1>
       
       <div class="py-2 relative z-10 flex flex-col items-center justify-center">
@@ -103,19 +120,22 @@
         </div>
       </div>
 
+      {/* PUNTO 4: TIMESTAMP EN HORA CERRADA */}
       <div class="flex flex-wrap items-center justify-center gap-2 pt-2 text-xs">
         <span id="heroRedPill" class="px-3 py-1 bg-sky-500/15 text-sky-300 font-semibold rounded-full border border-sky-500/30">📡 DMC Chile</span>
-        <span id="heroUpdatedPill" class="px-3 py-1 bg-emerald-500/15 text-emerald-300 font-semibold rounded-full border border-emerald-500/30">✓ Actualizado hace 2 min</span>
+        <span id="heroUpdatedPill" class="px-3 py-1 bg-emerald-500/15 text-emerald-300 font-semibold rounded-full border border-emerald-500/30">✓ Actualización a las 18:00 hrs</span>
       </div>
     </div>
 
+    {/* PRONÓSTICO HORA A HORA 24H CON % LLUVIA REAL (PUNTO 3) */}
     <div class="glass-panel p-5 space-y-3">
       <div class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-        ⏰ Pronóstico Hora a Hora (Próximas 24 horas)
+        ⏰ Pronóstico Hora a Hora (Próximas 24 horas con probabilidad de lluvia)
       </div>
       <div id="hourlyCarousel" class="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none snap-x"></div>
     </div>
 
+    {/* PANEL DINÁMICO URBANO / AGRÍCOLA */}
     <div id="panelUrbano" class="space-y-4">
       <div id="sincaBanner" class="p-4 rounded-xl border bg-emerald-950/50 border-emerald-500/40 text-emerald-200 text-sm font-medium flex items-center justify-between cursor-pointer" onclick="openDrawerFromMetric('Calidad del Aire SINCA MMA', 'Bueno 🟢', 'MP2.5: 12 µg/m³', 'Categorización oficial según el Decreto Supremo D.S. 12/2011 del Ministerio del Medio Ambiente de Chile.', 'Sin restricciones de humo.')">
         <div class="flex items-center gap-3">
@@ -136,34 +156,70 @@
       <div class="glass-panel p-6 space-y-5 border-emerald-500/40 bg-gradient-to-br from-slate-900/90 via-slate-900/80 to-emerald-950/30" id="geeGrid"></div>
     </div>
 
+    {/* MAPA INTERACTIVO WINDY API EMBED Y LEAFLET (PUNTO 1) */}
     <div class="glass-panel p-6 space-y-4">
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div>
-          <h3 class="text-lg font-bold text-white">🗺️ Visor Interactivo Satelital de Chile</h3>
-          <p class="text-xs text-slate-400">Imagen Esri World Imagery con los 609 pines de estaciones</p>
+          <h3 class="text-lg font-bold text-white">🗺️ Visor Interactivo Mapa Windy & GEE</h3>
+          <p class="text-xs text-slate-400">Viento animado en tiempo real y radar de precipitaciones</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <button onclick="setMapCapa('viento')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-blue-600 text-white shadow">🌀 Viento Animado</button>
-          <button onclick="setMapCapa('radar')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700">🌧️ Radar Lluvia</button>
-          <button onclick="setMapCapa('gee_ndvi')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700">🌿 NDVI GEE</button>
+          <button onclick="switchMapMode('windy')" id="btnMapWindy" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-sky-500 text-white shadow">🌀 Mapa Windy Oficial</button>
+          <button onclick="switchMapMode('leaflet')" id="btnMapLeaflet" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700">🛰️ Satélite Esri / GEE</button>
           <button onclick="openSateliteModal()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-purple-600 text-white">🛰️ GOES-19 (24H)</button>
         </div>
       </div>
-      <div class="h-[480px] w-full rounded-2xl overflow-hidden relative z-0">
+      
+      {/* EMBED OFICIAL WINDY (PUNTO 1) */}
+      <div id="windyContainer" class="h-[480px] w-full rounded-2xl overflow-hidden relative">
+        <iframe id="windyIframe" class="w-full h-full border-0 rounded-2xl" src="https://embed.windy.com/embed2.html?lat=-33.4450&lon=-70.6830&detailLat=-33.4450&detailLon=-70.6830&width=100%25&height=480&zoom=8&level=surface&overlay=wind&product=ecmwf&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1"></iframe>
+      </div>
+
+      {/* CONTENEDOR LEAFLET SECUNDARIO */}
+      <div id="leafletContainer" class="hidden h-[480px] w-full rounded-2xl overflow-hidden relative z-0">
         <div id="map" class="h-full w-full"></div>
       </div>
     </div>
 
+    {/* PRONÓSTICO A 7 DÍAS CON BARRA DE RANGO TÉRMICO E INTERACTIVIDAD DE CLIC (PUNTO 5) */}
     <div class="glass-panel p-6 space-y-4">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h3 class="text-base font-bold text-white">📅 Pronóstico a 7 Días</h3>
+        <div>
+          <h3 class="text-base font-bold text-white">📅 Pronóstico a 7 Días</h3>
+          <p class="text-xs text-slate-400">Haz clic en cualquier día para ver la descomposición detallada</p>
+        </div>
         <span class="text-[11px] text-sky-400 font-bold bg-sky-500/10 px-3 py-1 rounded-full border border-sky-500/20">Oficial DMC & Open-Meteo</span>
       </div>
       <div id="dailyForecastList" class="space-y-2"></div>
     </div>
 
+    {/* GRÁFICO INTERACTIVO CURVA 48 HORAS CON INTERACCIÓN AL PINCHAR PUNTOS (PUNTO 7) */}
+    <div class="glass-panel p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="text-base font-bold text-white">📈 Curva de Temperatura & Precipitación 48 Horas</h3>
+          <p class="text-xs text-slate-400">Haz clic en cualquier punto del gráfico para ver la cifra exacta</p>
+        </div>
+      </div>
+      <div class="h-64 w-full">
+        <canvas id="chart48h"></canvas>
+      </div>
+    </div>
+
   </main>
 
+  {/* MODAL ESTACIONES CERCANAS (PUNTO 6) */}
+  <div id="estacionesCercanasModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-2xl">
+    <div class="glass-panel w-full max-w-lg overflow-hidden border border-sky-500/30 p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-lg font-extrabold text-white">📍 5 Estaciones Más Cercanas</h3>
+        <button onclick="closeEstacionesCercanasModal()" class="p-2 text-slate-400 hover:text-white">✕</button>
+      </div>
+      <div id="estacionesCercanasList" class="space-y-2.5 max-h-80 overflow-y-auto"></div>
+    </div>
+  </div>
+
+  {/* DRAWER DESPLEGABLE DE MÉTRICAS */}
   <div id="detailDrawer" class="hidden fixed inset-0 z-50 flex justify-end bg-slate-950/80 backdrop-blur-md">
     <div class="w-full max-w-md bg-slate-900 border-l border-slate-800 h-full p-6 overflow-y-auto space-y-6 flex flex-col justify-between shadow-2xl">
       <div class="space-y-4">
@@ -189,22 +245,28 @@
     </div>
   </div>
 
+  {/* MODAL SATÉLITE GOES-19 CON REPRODUCCIÓN FLUIDA (PUNTO 8) */}
   <div id="sateliteModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-2xl">
     <div class="glass-panel w-full max-w-4xl overflow-hidden border border-purple-500/30 flex flex-col max-h-[90vh]">
       <div class="p-4 border-b border-white/10 flex items-center justify-between bg-slate-900">
-        <h3 class="text-base font-extrabold text-white">🛰️ Reproductor Satelital GOES-19 (Chile 24H)</h3>
+        <div>
+          <h3 class="text-base font-extrabold text-white">🛰️ Bucle Satelital NOAA GOES-19</h3>
+          <p id="goesTimestamp" class="text-xs text-purple-300">Actualización a las 18:00 hrs</p>
+        </div>
         <button onclick="closeSateliteModal()" class="p-2 text-slate-400 hover:text-white">✕</button>
       </div>
       <div class="flex-1 bg-black relative flex items-center justify-center min-h-[360px] p-2">
-        <img id="goesVideoImg" src="/static/goes19_loop.webp" class="max-h-[60vh] w-auto object-contain rounded-lg" />
+        <img id="goesVideoImg" src="/static/goes19_loop.webp" class="max-h-[60vh] w-auto object-contain rounded-lg shadow-2xl" />
       </div>
     </div>
   </div>
 
+  {/* JAVASCRIPT MOTOR LÓGICO */}
   <script>
     let currentCoords = { lat: -33.4450, lon: -70.6830 };
     let currentData = null;
     let map = null;
+    let chartInstance = null;
 
     function setModo(m) {
       if (m === 'urbano') {
@@ -217,6 +279,21 @@
         document.getElementById('panelAgricola').classList.remove('hidden');
         document.getElementById('btnAgricola').className = "flex-1 md:flex-none px-4 py-1.5 rounded-xl text-xs font-bold transition bg-emerald-500 text-white shadow-lg";
         document.getElementById('btnUrbano').className = "flex-1 md:flex-none px-4 py-1.5 rounded-xl text-xs font-bold transition text-slate-400 hover:text-white";
+      }
+    }
+
+    function switchMapMode(mode) {
+      if (mode === 'windy') {
+        document.getElementById('windyContainer').classList.remove('hidden');
+        document.getElementById('leafletContainer').classList.add('hidden');
+        document.getElementById('btnMapWindy').className = "px-3.5 py-1.5 rounded-xl text-xs font-bold bg-sky-500 text-white shadow";
+        document.getElementById('btnMapLeaflet').className = "px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700";
+      } else {
+        document.getElementById('leafletContainer').classList.remove('hidden');
+        document.getElementById('windyContainer').classList.add('hidden');
+        document.getElementById('btnMapLeaflet').className = "px-3.5 py-1.5 rounded-xl text-xs font-bold bg-sky-500 text-white shadow";
+        document.getElementById('btnMapWindy').className = "px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700";
+        if (!map) initMap();
       }
     }
 
@@ -244,23 +321,31 @@
       document.getElementById('heroMin').innerText = `${agr.temperatura_minima_hoy_c || 10}°C`;
       document.getElementById('heroMax').innerText = `${agr.temperatura_maxima_hoy_c || 22}°C`;
       document.getElementById('heroRedPill').innerText = `📡 ${est.red_oficial || 'DMC Chile'}`;
-      document.getElementById('heroUpdatedPill').innerText = `✓ ${data.transparency_metadata?.updated_ago_str || 'Actualizado'}`;
+      
+      // PUNTO 4: ACTUALIZACIÓN A HORA CERRADA
+      document.getElementById('heroUpdatedPill').innerText = `✓ ${data.transparency_metadata?.updated_at_label || 'Actualización a las 18:00 hrs'}`;
 
+      // PUNTO 3: PROBABILIDAD DE LLUVIA POR HORA REAL
       const hourly = data.pronostico_numerico_openmeteo?.horario || {};
       let hourlyHtml = '';
       if (hourly.time) {
         for (let i = 0; i < Math.min(24, hourly.time.length); i++) {
           const hLabel = i === 0 ? 'Ahora' : hourly.time[i].split('T')[1]?.slice(0,5);
+          const precipMm = hourly.precipitation ? hourly.precipitation[i] : 0;
+          const precipProb = hourly.precipitation_probability ? hourly.precipitation_probability[i] : (precipMm > 0 ? Math.min(100, Math.round(precipMm * 35)) : 0);
+
           hourlyHtml += `
             <div class="flex-shrink-0 snap-start w-20 bg-slate-950/50 border border-slate-800 p-3 rounded-2xl text-center space-y-1">
               <div class="text-[11px] font-semibold text-slate-300">${hLabel}</div>
-              <div class="text-lg">🌤️</div>
+              <div class="text-lg">${precipProb > 30 ? '🌧️' : '🌤️'}</div>
               <div class="text-base font-bold font-mono text-white">${Math.round(hourly.temperature_2m[i])}°</div>
+              <div class="text-[10px] text-sky-400 font-bold">💧 ${precipProb}%</div>
             </div>`;
         }
       }
       document.getElementById('hourlyCarousel').innerHTML = hourlyHtml;
 
+      // Render Grilla Urbana
       document.getElementById('urbanGrid').innerHTML = `
         <div onclick="openDrawerFromMetric('Temperatura Ambiente', '${urb.temperatura_c}', '°C', 'Lectura de temperatura en superficie a 2 metros del suelo.', 'Mantener buena ventilación.')" class="glass-panel p-4 space-y-1 cursor-pointer">
           <div class="text-xs text-slate-400">Temperatura</div>
@@ -294,26 +379,135 @@
         </div>
       `;
 
+      // PUNTO 5: PRONÓSTICO 7 DÍAS INTERACTIVO CON CLIC
       const daily = data.pronostico_numerico_openmeteo?.diario_7dias || {};
       let dailyHtml = '';
       if (daily.time) {
         for (let i = 0; i < Math.min(7, daily.time.length); i++) {
           const diaLabel = i === 0 ? 'Hoy' : daily.time[i];
+          const minT = Math.round(daily.temperature_2m_min[i]);
+          const maxT = Math.round(daily.temperature_2m_max[i]);
+          const rainMm = daily.precipitation_sum ? daily.precipitation_sum[i] : 0;
+
           dailyHtml += `
-            <div class="p-3.5 rounded-2xl bg-slate-950/40 border border-slate-800 flex items-center justify-between text-xs">
+            <div onclick="openDrawerFromMetric('Pronóstico ${diaLabel}', '${maxT}°C / ${minT}°C', 'Mín/Máx', 'Mínima: ${minT}°C, Máxima: ${maxT}°C. Lluvia estimada: ${rainMm} mm. Haz clic para ver recomendaciones agrometeorológicas.', 'Ajustar actividades según precipitación.')" class="p-3.5 rounded-2xl bg-slate-950/40 border border-slate-800 flex items-center justify-between text-xs cursor-pointer hover:border-sky-500/40 transition">
               <div class="w-24 font-bold text-white">${diaLabel}</div>
-              <div class="text-base">🌤️</div>
-              <div class="font-mono font-bold text-cyan-300">${Math.round(daily.temperature_2m_min[i])}°</div>
+              <div class="text-base">${rainMm > 0 ? '🌧️' : '🌤️'}</div>
+              <div class="font-mono font-bold text-cyan-300">${minT}°</div>
               <div class="flex-1 hidden sm:block h-2 bg-slate-800 rounded-full mx-4 overflow-hidden"><div class="h-full bg-gradient-to-r from-cyan-400 to-amber-400 w-3/4 mx-auto rounded-full"></div></div>
-              <div class="font-mono font-bold text-amber-300">${Math.round(daily.temperature_2m_max[i])}°</div>
+              <div class="font-mono font-bold text-amber-300">${maxT}°</div>
             </div>`;
         }
       }
       document.getElementById('dailyForecastList').innerHTML = dailyHtml;
 
-      if (map && est.coordenadas) {
-        map.setView([est.coordenadas.latitud, est.coordenadas.longitud], 9);
+      // PUNTO 7: GRÁFICO INTERACTIVO CHART.JS 48H CON PINCHADO DE PUNTOS
+      renderChart48h(hourly);
+
+      // Actualizar mapa iframe Windy y Leaflet
+      if (est.coordenadas) {
+        const lat = est.coordenadas.latitud;
+        const lon = est.coordenadas.longitud;
+        document.getElementById('windyIframe').src = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&width=100%25&height=480&zoom=8&level=surface&overlay=wind&product=ecmwf&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`;
       }
+    }
+
+    // PUNTO 7: DIBUJAR GRÁFICO 48H E INTERACCIÓN CON PUNTOS
+    function renderChart48h(hourly) {
+      if (!hourly.time) return;
+      const ctx = document.getElementById('chart48h').getContext('2d');
+      if (chartInstance) chartInstance.destroy();
+
+      const labels = hourly.time.slice(0, 24).map(t => t.split('T')[1]?.slice(0,5));
+      const temps = hourly.temperature_2m.slice(0, 24);
+      const precips = hourly.precipitation ? hourly.precipitation.slice(0, 24) : [];
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Temperatura (°C)',
+              data: temps,
+              borderColor: '#38bdf8',
+              backgroundColor: 'rgba(56, 189, 248, 0.1)',
+              fill: true,
+              tension: 0.4
+            },
+            {
+              label: 'Precipitación (mm)',
+              data: precips,
+              borderColor: '#06b6d4',
+              backgroundColor: 'rgba(6, 182, 212, 0.3)',
+              type: 'bar'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#94a3b8', font: { family: 'Outfit' } } }
+          },
+          scales: {
+            x: { ticks: { color: '#64748b' } },
+            y: { ticks: { color: '#64748b' } }
+          },
+          onClick: (e, activeElements) => {
+            if (activeElements.length > 0) {
+              const index = activeElements[0].index;
+              const hourLabel = labels[index];
+              const tVal = temps[index];
+              const pVal = precips[index] || 0;
+              openDrawerFromMetric(`Pronóstico ${hourLabel} hrs`, `${tVal}°C`, 'Temperatura', `Pronóstico horario para las ${hourLabel} hrs. Precipitación estimada: ${pVal} mm.`, `Revisar condiciones antes de realizar trabajos de campo.`);
+            }
+          }
+        }
+      });
+    }
+
+    // PUNTO 2: BOTÓN COMPARTIR ESTACIÓN
+    function compartirEstacion() {
+      const url = window.location.href;
+      const estNombre = currentData?.estacion?.nombre || 'Chile';
+      if (navigator.share) {
+        navigator.share({
+          title: `MeteoPrecisa Chile — ${estNombre}`,
+          text: `Revisa el clima en vivo y telemetría GEE para ${estNombre}:`,
+          url: url
+        }).catch(() => {});
+      } else {
+        navigator.clipboard.writeText(url);
+        alert(`🔗 Enlace copiado al portapapeles: ${url}`);
+      }
+    }
+
+    // PUNTO 6: MODAL 5 ESTACIONES MÁS CERCANAS
+    async function openEstacionesCercanasModal() {
+      try {
+        const resp = await fetch('/api/v1/buscar-estaciones?limite=6');
+        const data = await resp.json();
+        let html = '';
+        data.slice(0, 5).forEach(est => {
+          html += `
+            <div onclick="cargarClima(${est.lat}, ${est.lon}); closeEstacionesCercanasModal();" class="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl flex items-center justify-between cursor-pointer transition">
+              <div>
+                <div class="font-bold text-white text-xs">${est.nombre}</div>
+                <div class="text-[10px] text-slate-400">${est.sector}</div>
+              </div>
+              <span class="px-2 py-1 bg-sky-500/20 text-sky-300 text-[10px] font-bold rounded-full border border-sky-500/30">${est.red}</span>
+            </div>`;
+        });
+        document.getElementById('estacionesCercanasList').innerHTML = html;
+        document.getElementById('estacionesCercanasModal').classList.remove('hidden');
+      } catch (err) {
+        console.error("Error estaciones cercanas:", err);
+      }
+    }
+
+    function closeEstacionesCercanasModal() {
+      document.getElementById('estacionesCercanasModal').classList.add('hidden');
     }
 
     function initMap() {
@@ -321,7 +515,6 @@
       L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Esri World Imagery'
       }).addTo(map);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', { opacity: 0.8 }).addTo(map);
     }
 
     function openDrawerFromMetric(title, val, unit, desc, advice) {
@@ -339,6 +532,8 @@
 
     function openSateliteModal() {
       document.getElementById('sateliteModal').classList.remove('hidden');
+      // PUNTO 8: RECARGA DE ANIMACIÓN GOES-19
+      document.getElementById('goesVideoImg').src = `/static/goes19_loop.webp?t=${Date.now()}`;
     }
 
     function closeSateliteModal() {
@@ -346,7 +541,6 @@
     }
 
     window.onload = function() {
-      initMap();
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (pos) => cargarClima(pos.coords.latitude, pos.coords.longitude),

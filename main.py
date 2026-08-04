@@ -29,15 +29,11 @@ import goes_processor
 
 def construir_transparency_metadata(last_up_ts: int, boletin_dmc: dict = None, est_info: dict = None) -> dict:
     now_ts = int(time.time())
-    mins_ago = int((now_ts - last_up_ts) / 60) if last_up_ts > 0 else 0
-    iso_time = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(last_up_ts if last_up_ts > 0 else now_ts))
+    last_ts = last_up_ts if last_up_ts > 0 else now_ts
+    time_struct = time.localtime(last_ts)
+    time_str = time.strftime("%H:00", time_struct)
     
-    if mins_ago <= 0:
-        updated_str = "Se actualizó hace un instante"
-    elif mins_ago == 1:
-        updated_str = "Se actualizó hace 1 minuto"
-    else:
-        updated_str = f"Se actualizó hace {mins_ago} minutos"
+    updated_str = f"Actualización a las {time_str} hrs"
 
     boletin_txt = boletin_dmc.get("resumen_nacional", "") if isinstance(boletin_dmc, dict) else ""
     st_id = est_info.get("id", "dmc_oficial") if est_info else "dmc_oficial"
@@ -57,10 +53,12 @@ def construir_transparency_metadata(last_up_ts: int, boletin_dmc: dict = None, e
         "raw_source_url": raw_url,
         "is_live_data": True,
         "source_name": f"Dirección Meteorológica de Chile ({red_name}) / Google Earth Engine",
-        "last_fetched_timestamp": iso_time,
+        "last_fetched_timestamp": time.strftime("%Y-%m-%dT%H:00:00Z", time.gmtime(last_ts)),
         "updated_ago_str": updated_str,
+        "updated_at_label": f"Actualización a las {time_str} hrs",
         "official_bulletin": boletin_txt or "Predominio de estabilidad atmosférica en la zona central y valles interiores de Chile."
     }
+
 
 
 
