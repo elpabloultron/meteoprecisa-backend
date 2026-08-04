@@ -9,8 +9,10 @@ import httpx
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from goes_processor import procesar_video_goes19
 
 load_dotenv()
+
 
 
 if sys.stdout and hasattr(sys.stdout, 'buffer') and sys.stdout.encoding != 'utf-8':
@@ -511,6 +513,9 @@ async def ejecutar_sincronizacion_completa():
     telemetria_global = {}
 
     async with httpx.AsyncClient(headers=HEADERS, follow_redirects=True, verify=False) as client:
+        # Lanzar generación de bucle WebP GOES-19 asíncronamente
+        asyncio.create_task(procesar_video_goes19())
+        
         sat_data, (dmc_tele, dmc_cat), (agromet_tele, agromet_cat), (redmeteo_tele, redmeteo_cat), sinca_data, dmc_boletin, senapred_data = await asyncio.gather(
             sincronizar_satelite_goes19(client),
             sincronizar_dmc_telemetria(client),
@@ -521,6 +526,7 @@ async def ejecutar_sincronizacion_completa():
             sincronizar_alertas_senapred(client),
             return_exceptions=True
         )
+
     
     if isinstance(sat_data, dict):
         CACHE_MEMORIA["satelite_goes19"] = sat_data
