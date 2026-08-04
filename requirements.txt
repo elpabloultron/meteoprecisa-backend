@@ -10,4 +10,6 @@ pandas
 earthengine-api
 google-auth
 python-dotenv
+Pillow
+
 

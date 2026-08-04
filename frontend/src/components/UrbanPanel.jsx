@@ -1,7 +1,7 @@
 import React from 'react';
-import { Wind, Thermometer, Droplets, Sun, Activity, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Wind, Thermometer, Droplets, Sun, Activity, ShieldCheck, AlertTriangle, ChevronRight } from 'lucide-react';
 
-export default function UrbanPanel({ urbano }) {
+export default function UrbanPanel({ urbano, onSelectMetric, stationInfo }) {
   if (!urbano) return null;
 
   const {
@@ -19,8 +19,9 @@ export default function UrbanPanel({ urbano }) {
   const aqiVal = calidad_aire_sinca?.aqi_us || calidad_aire_sinca?.tabla_internacional_aqi?.aqi_indice || 25;
   const mp25Val = calidad_aire_sinca?.mp25_ugm3 || calidad_aire_sinca?.mediciones_base?.mp25_ug_m3 || 12.0;
 
+  const stationId = stationInfo?.station_id || stationInfo?.id || "dmc_330020";
+  const rawSourceUrl = stationInfo?.raw_source_url || "https://climatologia.meteochile.gob.cl";
 
-  // Determinar mensaje de estado inspirado en el panel MDO
   let statusBg = 'bg-emerald-950/50 border-emerald-500/40 text-emerald-200';
   let statusIcon = <ShieldCheck className="w-5 h-5 text-emerald-400" />;
   let statusText = `✓ Calidad del Aire Excelente (MP2.5: ${mp25Val} µg/m³ - Norma Cumplida)`;
@@ -35,78 +36,118 @@ export default function UrbanPanel({ urbano }) {
     statusText = `🔴 Emergencia / Preemergencia Ambiental (${mp25Val} µg/m³ - Prohibido Calefactores a Leña)`;
   }
 
+  const handleCardClick = (title, value, unit, description, advice, category = "Urbano") => {
+    if (onSelectMetric) {
+      onSelectMetric({
+        title,
+        value,
+        unit,
+        description,
+        advice,
+        category,
+        stationId,
+        rawSourceUrl,
+        isLiveData: true
+      });
+    }
+  };
+
   return (
     <div className="space-y-4">
       
-      {/* PANEL DE RESULTADO / CAJA DE RESPUESTA DE CALIDAD DEL AIRE */}
-      <div className={`p-4 rounded-xl border flex items-center gap-3 font-medium text-sm ${statusBg}`}>
-        {statusIcon}
-        <div>
-          <div className="font-bold">{statusText}</div>
-          <p className="text-xs opacity-80 mt-0.5">
-            Estación de Monitoreo SINCA MMA • Red de Calidad del Aire Ministerio del Medio Ambiente
-          </p>
+      {/* CAJA DE ESTADO Y AUDITORÍA SINCA MMA */}
+      <div
+        onClick={() => handleCardClick("Calidad del Aire SINCA MMA", sincaNom, `MP2.5: ${mp25Val} µg/m³`, "Categorización oficial según el Decreto Supremo D.S. 12/2011 del Ministerio del Medio Ambiente de Chile para material particulado respirable.", "Evitar actividad física intensa al aire libre si la categoría es Alerta o Preemergencia.", "Medio Ambiente")}
+        className={`p-4 rounded-xl border flex items-center justify-between gap-3 font-medium text-sm cursor-pointer transition hover:opacity-95 ${statusBg}`}
+      >
+        <div className="flex items-center gap-3">
+          {statusIcon}
+          <div>
+            <div className="font-bold">{statusText}</div>
+            <p className="text-xs opacity-80 mt-0.5">
+              Estación SINCA MMA • Haz clic para auditoría de fuente cruda ↗
+            </p>
+          </div>
         </div>
+        <ChevronRight className="w-5 h-5 opacity-60" />
       </div>
 
-      {/* GRILLA DE METRICAS URBANAS PRINCIPALES */}
+      {/* GRILLA DE MÉTRICAS URBANAS INTERACTIVAS */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         
         {/* TEMPERATURA */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2">
+        <div
+          onClick={() => handleCardClick("Temperatura Ambiente", temperatura_c, "°C", `Lectura de temperatura en aire a 2 metros del suelo. Sensación térmica: ${sensacion_termica_c}°C.`, "Mantener ventilación adecuada.", "Temperatura")}
+          className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2 cursor-pointer hover:border-sky-500/40 hover:bg-slate-850 transition group"
+        >
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Temperatura</span>
-            <Thermometer className="w-4 h-4 text-amber-400" />
+            <Thermometer className="w-4 h-4 text-amber-400 group-hover:scale-110 transition" />
           </div>
           <div className="text-2xl font-black text-white font-mono">{temperatura_c}°C</div>
           <p className="text-[11px] text-slate-400">Sensación: <span className="text-amber-300 font-bold">{sensacion_termica_c}°C</span></p>
         </div>
 
         {/* HUMEDAD RELATIVA */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2">
+        <div
+          onClick={() => handleCardClick("Humedad Relativa", humedad_relativa_porcentaje, "%", "Porcentaje de saturación de vapor de agua en el aire.", "Altas humedades aumentan la sensación de frío invernal.", "Humedad")}
+          className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2 cursor-pointer hover:border-sky-500/40 hover:bg-slate-850 transition group"
+        >
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Humedad</span>
-            <Droplets className="w-4 h-4 text-blue-400" />
+            <Droplets className="w-4 h-4 text-blue-400 group-hover:scale-110 transition" />
           </div>
           <div className="text-2xl font-black text-white font-mono">{humedad_relativa_porcentaje}%</div>
-          <p className="text-[11px] text-slate-400">Humedad en superficie</p>
+          <p className="text-[11px] text-slate-400">Superficie</p>
         </div>
 
         {/* VIENTO */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2">
+        <div
+          onClick={() => handleCardClick("Velocidad y Dirección del Viento", viento_velocidad_kmh, "km/h", `Viento sostenido con dirección proveniente del ${viento_direccion}.`, "Vientos sostenidos superiores a 40 km/h requieren precaución en estructuras livianas.", "Viento")}
+          className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2 cursor-pointer hover:border-sky-500/40 hover:bg-slate-850 transition group"
+        >
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Viento</span>
-            <Wind className="w-4 h-4 text-sky-400" />
+            <Wind className="w-4 h-4 text-sky-400 group-hover:scale-110 transition" />
           </div>
           <div className="text-2xl font-black text-white font-mono">{viento_velocidad_kmh} <span className="text-xs text-slate-400 font-normal">km/h</span></div>
           <p className="text-[11px] text-slate-400">Dirección: <span className="text-sky-300 font-bold">{viento_direccion}</span></p>
         </div>
 
         {/* ÍNDICE UV */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2">
+        <div
+          onClick={() => handleCardClick("Índice de Radiación UV", indice_uv, "UV", "Medición de radiación ultravioleta máxima estimada para el día.", "Usar bloqueador solar FPS 50+ durante horas centrales.", "Radiación")}
+          className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2 cursor-pointer hover:border-sky-500/40 hover:bg-slate-850 transition group"
+        >
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Índice UV</span>
-            <Sun className="w-4 h-4 text-amber-400" />
+            <Sun className="w-4 h-4 text-amber-400 group-hover:scale-110 transition" />
           </div>
           <div className="text-2xl font-black text-white font-mono">{indice_uv}</div>
-          <p className="text-[11px] text-slate-400">Radiación Solar Máxima</p>
+          <p className="text-[11px] text-slate-400">Máximo estimado</p>
         </div>
 
         {/* CALIDAD DEL AIRE SINCA */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2">
+        <div
+          onClick={() => handleCardClick("Norma de Calidad del Aire (MMA)", sincaNom, `MP2.5: ${mp25Val}`, "Índice de calidad de aire en tiempo real informado por la red SINCA del Ministerio del Medio Ambiente.", "Revisar restricciones de calefacción en valles saturados.", "MMA Chile")}
+          className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2 cursor-pointer hover:border-sky-500/40 hover:bg-slate-850 transition group"
+        >
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Norma MMA</span>
-            <Activity className="w-4 h-4 text-emerald-400" />
+            <Activity className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition" />
           </div>
           <div className="text-lg font-extrabold text-emerald-400">{sincaNom}</div>
           <p className="text-[11px] text-slate-400">MP2.5: <span className="font-mono font-bold text-white">{mp25Val} µg/m³</span></p>
         </div>
 
         {/* PRESIÓN ATMOSFÉRICA */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2">
+        <div
+          onClick={() => handleCardClick("Presión Atmosférica", presion_hpa, "hPa", "Presión barométrica reducida al nivel del mar.", "Altas presiones sostenidas indican estabilidad atmosférica e inversión térmica.", "Presión")}
+          className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2 cursor-pointer hover:border-sky-500/40 hover:bg-slate-850 transition group"
+        >
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Presión</span>
-            <Activity className="w-4 h-4 text-purple-400" />
+            <Activity className="w-4 h-4 text-purple-400 group-hover:scale-110 transition" />
           </div>
           <div className="text-2xl font-black text-white font-mono">{presion_hpa} <span className="text-xs text-slate-400 font-normal">hPa</span></div>
           <p className="text-[11px] text-slate-400">Nivel del mar</p>

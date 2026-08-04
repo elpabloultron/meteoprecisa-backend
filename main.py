@@ -25,8 +25,9 @@ from gee_engine import (
     obtener_ndvi_y_humedad_punto
 )
 import gee_service
+import goes_processor
 
-def construir_transparency_metadata(last_up_ts: int, boletin_dmc: dict = None) -> dict:
+def construir_transparency_metadata(last_up_ts: int, boletin_dmc: dict = None, est_info: dict = None) -> dict:
     now_ts = int(time.time())
     mins_ago = int((now_ts - last_up_ts) / 60) if last_up_ts > 0 else 0
     iso_time = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(last_up_ts if last_up_ts > 0 else now_ts))
@@ -39,13 +40,28 @@ def construir_transparency_metadata(last_up_ts: int, boletin_dmc: dict = None) -
         updated_str = f"Se actualizó hace {mins_ago} minutos"
 
     boletin_txt = boletin_dmc.get("resumen_nacional", "") if isinstance(boletin_dmc, dict) else ""
+    st_id = est_info.get("id", "dmc_oficial") if est_info else "dmc_oficial"
+    red_name = est_info.get("red", "DMC / Agromet") if est_info else "DMC"
+    
+    if "dmc" in str(st_id).lower():
+        raw_url = "https://climatologia.meteochile.gob.cl"
+    elif "agromet" in str(st_id).lower():
+        raw_url = "https://agrometeorologia.cl"
+    elif "redmeteo" in str(st_id).lower():
+        raw_url = "https://redmeteo.cl"
+    else:
+        raw_url = "https://servicios.meteochile.gob.cl"
 
     return {
-        "source_name": "Dirección Meteorológica de Chile / Google Earth Engine",
+        "station_id": st_id,
+        "raw_source_url": raw_url,
+        "is_live_data": True,
+        "source_name": f"Dirección Meteorológica de Chile ({red_name}) / Google Earth Engine",
         "last_fetched_timestamp": iso_time,
         "updated_ago_str": updated_str,
         "official_bulletin": boletin_txt or "Predominio de estabilidad atmosférica en la zona central y valles interiores de Chile."
     }
+
 
 
 try:
@@ -516,12 +532,18 @@ async def obtener_clima_hiperlocal(
     
     texto_sync = f"Sincronizado a las {time_str} hrs (hace {mins_ago} min)"
 
+    st_id = estacion_cercana.get("id", "dmc_oficial")
+    raw_url = "https://climatologia.meteochile.gob.cl" if "dmc" in str(st_id).lower() else ("https://agrometeorologia.cl" if "agromet" in str(st_id).lower() else "https://redmeteo.cl")
+
     return {
         "estacion": {
-            "id": estacion_cercana["id"],
+            "id": st_id,
+            "station_id": st_id,
             "nombre": estacion_cercana["nombre"],
             "sector": estacion_cercana.get("sector", "Chile"),
             "red_oficial": estacion_cercana.get("red", "DMC / Agromet"),
+            "raw_source_url": raw_url,
+            "is_live_data": True,
             "coordenadas": {
                 "latitud": estacion_cercana["lat"],
                 "longitud": estacion_cercana["lon"]
@@ -535,7 +557,7 @@ async def obtener_clima_hiperlocal(
             "horario": hourly_om
         },
         "alerta_oficial_senapred": alerta_destacada,
-        "transparency_metadata": construir_transparency_metadata(last_up_ts, boletin_dmc),
+        "transparency_metadata": construir_transparency_metadata(last_up_ts, boletin_dmc, estacion_cercana),
         "metadatos": {
             "distancia_km": round(dist_min, 2),
             "orientacion": rumbo,
@@ -545,6 +567,10 @@ async def obtener_clima_hiperlocal(
             "sincronizacion_texto": texto_sync
         }
     }
+
+@app.get("/api/v1/satellite/latest-loop")
+async def obtener_satelite_latest_loop_api():
+    return goes_processor.obtener_satellite_latest_loop()
 
 @app.get("/api/v1/weather/current")
 async def obtener_clima_actual_api(
@@ -556,6 +582,7 @@ async def obtener_clima_actual_api(
     if longitud_final is None:
         raise HTTPException(status_code=400, detail="Debe proporcionar el parámetro 'lng' o 'lon'.")
     return await obtener_clima_hiperlocal(lat=lat, lon=longitud_final)
+
 
 @app.post("/api/v1/admin/sincronizar-ahora")
 async def forzar_sincronizacion_manual():

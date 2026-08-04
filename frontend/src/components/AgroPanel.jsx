@@ -1,7 +1,7 @@
 import React from 'react';
-import { Sprout, Snowflake, Droplet, Sun, Wind, CloudRain, Cpu, Sparkles } from 'lucide-react';
+import { Sprout, Snowflake, Sun, Wind, CloudRain, Cpu, ChevronRight } from 'lucide-react';
 
-export default function AgroPanel({ agricola }) {
+export default function AgroPanel({ agricola, onSelectMetric, stationInfo }) {
   if (!agricola) return null;
 
   const {
@@ -20,6 +20,25 @@ export default function AgroPanel({ agricola }) {
     fuente_agronomica
   } = agricola;
 
+  const stationId = stationInfo?.station_id || stationInfo?.id || "agromet_inia";
+  const rawSourceUrl = stationInfo?.raw_source_url || "https://agrometeorologia.cl";
+
+  const handleCardClick = (title, value, unit, description, advice, category = "Agrometeorología") => {
+    if (onSelectMetric) {
+      onSelectMetric({
+        title,
+        value,
+        unit,
+        description,
+        advice,
+        category,
+        stationId,
+        rawSourceUrl,
+        isLiveData: true
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       
@@ -27,50 +46,62 @@ export default function AgroPanel({ agricola }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         
         {/* TARJETA 1: EVAPOTRANSPIRACIÓN ETo */}
-        <div className="glass-panel p-4 flex items-center gap-3">
-          <div className="p-3 bg-emerald-500/15 text-emerald-400 rounded-xl border border-emerald-500/20">
+        <div
+          onClick={() => handleCardClick("Evapotranspiración ETo (FAO-56)", evapotranspiracion_eto_mm_dia, "mm/día", "Consumo hídrico teórico diario de una pradera de referencia sin restricciones hídricas, calculado bajo la ecuación Penman-Monteith (FAO-56).", "Programar reposición de lámina de riego según coeficiente de cultivo (Kc).", "Riego & Evaporación")}
+          className="glass-panel p-4 flex items-center gap-3 cursor-pointer hover:border-emerald-500/50 hover:bg-slate-850 transition group"
+        >
+          <div className="p-3 bg-emerald-500/15 text-emerald-400 rounded-xl border border-emerald-500/20 group-hover:scale-110 transition">
             <Sprout className="w-6 h-6" />
           </div>
           <div>
             <div className="text-xs text-slate-400 font-medium">Evapotranspiración ETo</div>
             <div className="text-xl font-bold font-mono text-white">{evapotranspiracion_eto_mm_dia} <span className="text-xs font-sans text-slate-400">mm/día</span></div>
-            <div className="text-[11px] text-slate-500">Consumo hídrico FAO-56</div>
+            <div className="text-[11px] text-slate-500">FAO-56</div>
           </div>
         </div>
 
         {/* TARJETA 2: HORAS FRÍO */}
-        <div className="glass-panel p-4 flex items-center gap-3">
-          <div className="p-3 bg-cyan-500/15 text-cyan-400 rounded-xl border border-cyan-500/20">
+        <div
+          onClick={() => handleCardClick("Horas Frío Acumuladas", horas_frio_acumuladas_24h, "hrs ≤7°C", "Acumulación de horas con temperatura menor o igual a 7°C en las últimas 24 horas para romper el receso invernal en frutales caducos.", "Monitorear requerimiento térmico según especie (cerezos, nogales, manzanos).", "Receso Invernal")}
+          className="glass-panel p-4 flex items-center gap-3 cursor-pointer hover:border-cyan-500/50 hover:bg-slate-850 transition group"
+        >
+          <div className="p-3 bg-cyan-500/15 text-cyan-400 rounded-xl border border-cyan-500/20 group-hover:scale-110 transition">
             <Snowflake className="w-6 h-6" />
           </div>
           <div>
             <div className="text-xs text-slate-400 font-medium">Horas Frío (≤7°C)</div>
             <div className="text-xl font-bold font-mono text-white">{horas_frio_acumuladas_24h} <span className="text-xs font-sans text-slate-400">hrs</span></div>
-            <div className="text-[11px] text-slate-500">Últimas 24 horas</div>
+            <div className="text-[11px] text-slate-500">Últimas 24h</div>
           </div>
         </div>
 
         {/* TARJETA 3: RADIACIÓN SOLAR */}
-        <div className="glass-panel p-4 flex items-center gap-3">
-          <div className="p-3 bg-amber-500/15 text-amber-400 rounded-xl border border-amber-500/20">
+        <div
+          onClick={() => handleCardClick("Radiación Solar Global", radiacion_solar_w_m2, "W/m²", "Insolación solar acumulada y disponible para fotosíntesis en el dosel vegetal.", "Proteger frutales sensibles en caso de golpes de calor en verano.", "Fotosíntesis")}
+          className="glass-panel p-4 flex items-center gap-3 cursor-pointer hover:border-amber-500/50 hover:bg-slate-850 transition group"
+        >
+          <div className="p-3 bg-amber-500/15 text-amber-400 rounded-xl border border-amber-500/20 group-hover:scale-110 transition">
             <Sun className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-xs text-slate-400 font-medium">Radiación Solar Global</div>
+            <div className="text-xs text-slate-400 font-medium">Radiación Solar</div>
             <div className="text-xl font-bold font-mono text-white">{radiacion_solar_w_m2} <span className="text-xs font-sans text-slate-400">W/m²</span></div>
-            <div className="text-[11px] text-slate-500">Insolación fotosintética</div>
+            <div className="text-[11px] text-slate-500">Insolación global</div>
           </div>
         </div>
 
         {/* TARJETA 4: RÁFAGAS & DERIVA */}
-        <div className="glass-panel p-4 flex items-center gap-3">
-          <div className="p-3 bg-teal-500/15 text-teal-400 rounded-xl border border-teal-500/20">
+        <div
+          onClick={() => handleCardClick("Ráfagas & Deriva Fitosanitaria", rafagas_viento_kmh, "km/h", "Ráfaga máxima registrada en la estación. Vientos superiores a 15 km/h generan riesgo de deriva en aplicaciones fitosanitarias.", "Suspender aplicaciones de pulverización con vientos mayores a 15 km/h.", "Fitosanitario")}
+          className="glass-panel p-4 flex items-center gap-3 cursor-pointer hover:border-teal-500/50 hover:bg-slate-850 transition group"
+        >
+          <div className="p-3 bg-teal-500/15 text-teal-400 rounded-xl border border-teal-500/20 group-hover:scale-110 transition">
             <Wind className="w-6 h-6" />
           </div>
           <div>
             <div className="text-xs text-slate-400 font-medium">Ráfagas de Viento</div>
             <div className="text-xl font-bold font-mono text-white">{rafagas_viento_kmh} <span className="text-xs font-sans text-slate-400">km/h</span></div>
-            <div className="text-[11px] text-slate-500">Riesgo deriva fitosanitaria</div>
+            <div className="text-[11px] text-slate-500">Riesgo deriva</div>
           </div>
         </div>
 
@@ -80,7 +111,10 @@ export default function AgroPanel({ agricola }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         
         {/* TARJETA ALERTA DE HELADAS */}
-        <div className="glass-panel p-5 space-y-3 border-cyan-500/30">
+        <div
+          onClick={() => handleCardClick("Riesgo de Helada Radiativa", alerta_helada_agrometeorologica?.riesgo_helada, `Punto Rocío: ${alerta_helada_agrometeorologica?.temperatura_rocio_c}°C`, "Evaluación del punto de rocío (Dew Point) y caída de temperatura durante la noche.", "Activar control antiheladas (helices, riego por aspersión) si la temperatura bordea 0°C.", "Heladas")}
+          className="glass-panel p-5 space-y-3 border-cyan-500/30 cursor-pointer hover:border-cyan-400 transition"
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Snowflake className="w-5 h-5 text-cyan-400" />
@@ -94,13 +128,13 @@ export default function AgroPanel({ agricola }) {
             <span className="text-slate-400">Temperatura Punto de Rocío (Dew Point):</span>
             <span className="font-mono font-bold text-sky-400 text-sm">{alerta_helada_agrometeorologica?.temperatura_rocio_c}°C</span>
           </div>
-          <p className="text-[11px] text-slate-400">
-            💡 Un punto de rocío bajo cero o cercano a 0°C indica riesgo inminente de congelación y helada radiativa durante la madrugada.
-          </p>
         </div>
 
         {/* TEMPERATURAS EXTREMAS Y PRECIPITACIÓN */}
-        <div className="glass-panel p-5 space-y-3">
+        <div
+          onClick={() => handleCardClick("Precipitación & Extremas Diarias", `${lluvia_acumulada_hoy_mm} mm`, `Mín: ${temperatura_minima_hoy_c}°C / Máx: ${temperatura_maxima_hoy_c}°C`, "Resumen acumulado de lluvias y temperaturas extremas del día.", "Verificar balance hídrico mensual.", "Agua & Temperatura")}
+          className="glass-panel p-5 space-y-3 cursor-pointer hover:border-sky-400 transition"
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <CloudRain className="w-5 h-5 text-sky-400" />
@@ -135,14 +169,14 @@ export default function AgroPanel({ agricola }) {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-extrabold text-white">
-                  Análisis Satelital Google Earth Engine
+                  Análisis Satelital Google Earth Engine (GEE)
                 </h3>
                 <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 rounded-full border border-emerald-500/30">
                   Sentinel-2 10m & ERA5
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Índices agronómicos procesados mediante la nube de Google
+                Haz clic en cualquier capa para abrir la auditoría agronómica detallada
               </p>
             </div>
           </div>
@@ -155,10 +189,14 @@ export default function AgroPanel({ agricola }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
           {/* NDVI SALUD VEGETAL */}
-          <div className="bg-slate-900/80 p-5 rounded-2xl border border-white/10 space-y-3">
+          <div
+            onClick={() => handleCardClick("Índice Vegetativo NDVI (Sentinel-2)", salud_vegetacion_ndvi, "NDVI (0-1)", "Medido con reflectancia infrarroja B8/B4 del satélite Sentinel-2 de la Agencia Espacial Europea a 10 metros de resolución espacial.", "Valores sobre 0.50 indican praderas y cultivos con alta vigorosidad y cobertura foliar.", "Google Earth Engine")}
+            className="bg-slate-900/80 p-5 rounded-2xl border border-white/10 space-y-3 cursor-pointer hover:border-emerald-500/50 transition group"
+          >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+              <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
                 🌿 Salud de Vegetación (NDVI)
+                <ChevronRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-1 transition" />
               </span>
               <span className="text-lg font-extrabold font-mono text-emerald-300 bg-emerald-500/20 px-3 py-1 rounded-xl border border-emerald-500/40">
                 {salud_vegetacion_ndvi}
@@ -167,16 +205,17 @@ export default function AgroPanel({ agricola }) {
             <div className="text-sm font-semibold text-white">
               {estado_vigor_vegetativo}
             </div>
-            <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3 rounded-xl border border-white/5">
-              💡 Medido con reflectancia infrarroja B8/B4 del satélite Sentinel-2 de la Agencia Espacial Europea. Valores sobre 0.50 indican cultivos con abundante masa foliar activa.
-            </p>
           </div>
 
           {/* HUMEDAD DE SUELO ERA5 */}
-          <div className="bg-slate-900/80 p-5 rounded-2xl border border-white/10 space-y-3">
+          <div
+            onClick={() => handleCardClick("Humedad Volumétrica de Suelo (ERA5-Land)", humedad_suelo_volumetrica, "m³/m³", "Estimación de la fracción de volumen de agua contenida en los primeros 7 cm de la capa superficial del suelo.", "Ajustar programación de turnos de riego para evitar asfixia radicular.", "Google Earth Engine")}
+            className="bg-slate-900/80 p-5 rounded-2xl border border-white/10 space-y-3 cursor-pointer hover:border-sky-500/50 transition group"
+          >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-sky-400 uppercase tracking-wider">
+              <span className="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1">
                 💧 Humedad Volumétrica de Suelo
+                <ChevronRight className="w-4 h-4 text-sky-400 group-hover:translate-x-1 transition" />
               </span>
               <span className="text-lg font-extrabold font-mono text-sky-300 bg-sky-500/20 px-3 py-1 rounded-xl border border-sky-500/40">
                 {humedad_suelo_volumetrica} <span className="text-xs font-sans">m³/m³</span>
@@ -185,9 +224,6 @@ export default function AgroPanel({ agricola }) {
             <div className="text-sm font-semibold text-white">
               {estado_humedad_suelo}
             </div>
-            <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3 rounded-xl border border-white/5">
-              💡 Estimado del contenido de agua en la capa superficial (0-7cm). Permite optimizar turnos de riego y detectar déficits hídricos antes del marchitamiento.
-            </p>
           </div>
 
         </div>

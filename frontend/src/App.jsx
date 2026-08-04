@@ -9,6 +9,7 @@ import ForecastChart from './components/ForecastChart';
 import ComparisonTable from './components/ComparisonTable';
 import SatelliteModal from './components/SatelliteModal';
 import BottomNav from './components/BottomNav';
+import DetailDrawer from './components/DetailDrawer';
 
 const API_BASE = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ? 'http://localhost:8000'
@@ -21,6 +22,10 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [sateliteModalOpen, setSateliteModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('inicio');
+
+  // Estado para el DetailDrawer de métricas y auditoría
+  const [selectedMetric, setSelectedMetric] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const mapRef = useRef(null);
   const forecastRef = useRef(null);
@@ -74,10 +79,15 @@ export default function App() {
     }
   };
 
+  const handleSelectMetric = (metricInfo) => {
+    setSelectedMetric(metricInfo);
+    setDrawerOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-blue-500 selection:text-slate-950">
       
-      {/* NAVBAR NAVEGACIÓN PRINCIPAL CON ESTADO TIPO MDO */}
+      {/* NAVBAR NAVEGACIÓN PRINCIPAL */}
       <Navbar
         modo={modo}
         setModo={setModo}
@@ -99,11 +109,19 @@ export default function App() {
             {/* CABECERA DE CLIMA E INDICADORES DE ESTACIÓN & ALERTAS SENAPRED */}
             <WeatherHeader climaData={climaData} />
 
-            {/* PANEL MODO URBANO & MODO AGRÍCOLA */}
+            {/* PANEL MODO URBANO & MODO AGRÍCOLA CON EVENTOS ONCLICK */}
             {modo === 'urbano' ? (
-              <UrbanPanel urbano={climaData?.modo_urbano} />
+              <UrbanPanel
+                urbano={climaData?.modo_urbano}
+                onSelectMetric={handleSelectMetric}
+                stationInfo={climaData?.estacion}
+              />
             ) : (
-              <AgroPanel agricola={climaData?.modo_agricola} />
+              <AgroPanel
+                agricola={climaData?.modo_agricola}
+                onSelectMetric={handleSelectMetric}
+                stationInfo={climaData?.estacion}
+              />
             )}
 
             {/* SECCIÓN MAPA INTERACTIVO */}
@@ -142,7 +160,7 @@ export default function App() {
         <p>MeteoPrecisa Chile © 2026 — Plataforma Open Source de Meteorología & Agrometeorología Nacional</p>
       </footer>
 
-      {/* REPRODUCTOR SATELITAL FLUIDO GOES-19 */}
+      {/* REPRODUCTOR SATELITAL BUCLE WEBP GOES-19 */}
       <SatelliteModal
         isOpen={sateliteModalOpen}
         onClose={() => {
@@ -150,6 +168,13 @@ export default function App() {
           setActiveTab('inicio');
         }}
         apiBase={API_BASE}
+      />
+
+      {/* DRAWER DESPLEGABLE DE MÉTRICAS Y AUDITORÍA DE FUENTE */}
+      <DetailDrawer
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        detailData={selectedMetric}
       />
 
       {/* NAVEGACIÓN INFERIOR TÁCTIL (BOTTOM NAV BAR MÓVIL) */}
