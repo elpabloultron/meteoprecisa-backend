@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -12,7 +12,7 @@ import {
   Filler
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import { Calendar, FileText, CloudRain, Sun } from 'lucide-react';
+import { Calendar, FileText } from 'lucide-react';
 
 ChartJS.register(
   CategoryScale,
@@ -26,8 +26,8 @@ ChartJS.register(
   Filler
 );
 
-export default function ForecastChart({ dmcForecast, openMeteoForecast }) {
-  const daily = openMeteoForecast?.diario_7dias || {};
+export default function ForecastChart({ dmcForecast, openMeteoForecast, onSelectMetric }) {
+  const chartRef = useRef(null);
   const hourly = openMeteoForecast?.horario || {};
 
   const timeLabels = (hourly.time || []).slice(0, 48).map((t) => {
@@ -49,7 +49,8 @@ export default function ForecastChart({ dmcForecast, openMeteoForecast }) {
         backgroundColor: 'rgba(56, 189, 248, 0.15)',
         fill: true,
         tension: 0.4,
-        pointRadius: 2,
+        pointRadius: 4,
+        pointHoverRadius: 7,
         yAxisID: 'y'
       },
       {
@@ -60,10 +61,33 @@ export default function ForecastChart({ dmcForecast, openMeteoForecast }) {
         backgroundColor: 'rgba(16, 185, 129, 0.4)',
         fill: true,
         tension: 0.2,
-        pointRadius: 2,
+        pointRadius: 4,
+        pointHoverRadius: 7,
         yAxisID: 'y1'
       }
     ]
+  };
+
+  const onClickChart = (event) => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const activePoints = chart.getElementsAtEventForMode(event.nativeEvent, 'nearest', { intersect: true }, true);
+    if (activePoints.length > 0) {
+      const index = activePoints[0].index;
+      const hourLabel = timeLabels[index];
+      const tVal = temps[index];
+      const pVal = precips[index] || 0;
+
+      if (onSelectMetric) {
+        onSelectMetric({
+          title: `Pronóstico ${hourLabel} hrs`,
+          valor: `${tVal}°C`,
+          unidad: 'Temperatura',
+          descripcion: `Cifra estimada para las ${hourLabel} hrs. Precipitación: ${pVal} mm.`,
+          recomendacion: 'Cifra exacta obtenida del motor numérico.'
+        });
+      }
+    }
   };
 
   const chartOptions = {
@@ -122,15 +146,18 @@ export default function ForecastChart({ dmcForecast, openMeteoForecast }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-sky-400" />
-            <h3 className="text-base font-extrabold text-white">
-              Curva de Pronóstico Numérico Hora a Hora
-            </h3>
+            <div>
+              <h3 className="text-base font-extrabold text-white">
+                Curva de Pronóstico Numérico Hora a Hora
+              </h3>
+              <p className="text-xs text-slate-400">Haz clic en cualquier punto para ver la cifra exacta</p>
+            </div>
           </div>
           <span className="text-xs text-slate-400">Próximas 48 horas</span>
         </div>
 
         <div className="h-72 w-full pt-2">
-          <Line data={chartData} options={chartOptions} />
+          <Line ref={chartRef} data={chartData} options={chartOptions} onClick={onClickChart} />
         </div>
       </div>
 

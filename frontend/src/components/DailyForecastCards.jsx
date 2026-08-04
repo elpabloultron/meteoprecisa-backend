@@ -1,7 +1,7 @@
 import React from 'react';
-import { Sun, CloudSun, CloudRain, Snowflake, Droplets, Calendar, Sprout } from 'lucide-react';
+import { Sun, CloudSun, CloudRain, Snowflake, Calendar } from 'lucide-react';
 
-export default function DailyForecastCards({ dailyForecast }) {
+export default function DailyForecastCards({ dailyForecast, onSelectMetric }) {
   if (!dailyForecast || !dailyForecast.time || dailyForecast.time.length === 0) {
     return (
       <div className="glass-panel p-6 text-center text-slate-400 text-xs">
@@ -21,7 +21,6 @@ export default function DailyForecastCards({ dailyForecast }) {
 
   const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
-  // Encontrar el mínimo y máximo global para la barra de gradiente de temperatura
   const globalMin = Math.min(...temperature_2m_min.slice(0, 7).filter(n => n !== undefined));
   const globalMax = Math.max(...temperature_2m_max.slice(0, 7).filter(n => n !== undefined));
   const tempRange = (globalMax - globalMin) || 1;
@@ -33,16 +32,21 @@ export default function DailyForecastCards({ dailyForecast }) {
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
         <div className="flex items-center gap-2.5">
           <Calendar className="w-5 h-5 text-sky-400" />
-          <h3 className="text-base font-bold text-white">
-            Pronóstico a 7 Días
-          </h3>
+          <div>
+            <h3 className="text-base font-bold text-white">
+              Pronóstico a 7 Días
+            </h3>
+            <p className="text-[11px] text-slate-400">
+              Haz clic en cualquier día para abrir el desglose agrometeorológico
+            </p>
+          </div>
         </div>
         <span className="text-[11px] text-sky-400 font-bold bg-sky-500/10 px-3 py-1 rounded-full border border-sky-500/20">
-          Estacional DMC & Open-Meteo
+          Oficial DMC & Open-Meteo
         </span>
       </div>
 
-      {/* LISTA ESTILO APPLE WEATHER DE 7 DÍAS CON BARRA DE GRADIENTE DE TEMPERATURA */}
+      {/* LISTA ESTILO APPLE WEATHER DE 7 DÍAS INTERACTIVA */}
       <div className="space-y-2 pt-1">
         {time.slice(0, 7).map((fechaStr, idx) => {
           const dateObj = new Date(fechaStr + 'T12:00:00');
@@ -52,8 +56,8 @@ export default function DailyForecastCards({ dailyForecast }) {
           const tMin = temperature_2m_min[idx] !== undefined ? Math.round(temperature_2m_min[idx]) : 10;
           const rain = precipitation_sum[idx] || 0.0;
           const eto = et0_fao_evapotranspiration[idx] || 0.0;
+          const uv = uv_index_max[idx] || 5.0;
 
-          // Seleccionar icono según clima
           let IconComp = Sun;
           let iconColor = 'text-amber-400';
           if (rain > 1.0) {
@@ -67,17 +71,29 @@ export default function DailyForecastCards({ dailyForecast }) {
             iconColor = 'text-sky-300';
           }
 
-          // Cálculo de posiciones porcentuales para la barra de temperatura estilo iOS
           const leftPct = Math.max(0, Math.min(100, ((tMin - globalMin) / tempRange) * 100));
           const rightPct = Math.max(0, Math.min(100, ((globalMax - tMax) / tempRange) * 100));
+
+          const handleClick = () => {
+            if (onSelectMetric) {
+              onSelectMetric({
+                title: `Pronóstico ${nombreDia} (${dateObj.getDate()}/${dateObj.getMonth() + 1})`,
+                valor: `${tMax}°C / ${tMin}°C`,
+                unidad: 'Mín / Máx',
+                descripcion: `Mínima: ${tMin}°C, Máxima: ${tMax}°C. Lluvia acumulada estimada: ${rain} mm. Evapotranspiración ETo: ${eto} mm/día. UV Máximo: ${uv}.`,
+                recomendacion: rain > 2 ? 'Suspender aplicaciones de fitosanitarios por precipitaciones.' : 'Condiciones óptimas para ventilación de valles.'
+              });
+            }
+          };
 
           return (
             <div
               key={fechaStr}
-              className={`p-3.5 rounded-2xl flex items-center justify-between gap-4 transition duration-200 ${
+              onClick={handleClick}
+              className={`p-3.5 rounded-2xl flex items-center justify-between gap-4 transition duration-200 cursor-pointer ${
                 esHoy
-                  ? 'bg-gradient-to-r from-sky-950/60 to-slate-900 border border-sky-500/40'
-                  : 'bg-slate-950/40 border border-slate-800/60 hover:bg-slate-900/60'
+                  ? 'bg-gradient-to-r from-sky-950/60 to-slate-900 border border-sky-500/40 hover:border-sky-400'
+                  : 'bg-slate-950/40 border border-slate-800/60 hover:bg-slate-900/80 hover:border-slate-700'
               }`}
             >
               {/* DÍA & FECHA */}

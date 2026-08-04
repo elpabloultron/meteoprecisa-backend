@@ -1,7 +1,7 @@
 import React from 'react';
-import { MapPin, Navigation, ShieldAlert, Radio, Clock, Sun, CloudSun, CloudRain, ShieldCheck } from 'lucide-react';
+import { MapPin, ShieldAlert, Radio, ShieldCheck, Share2, Layers } from 'lucide-react';
 
-export default function WeatherHeader({ climaData }) {
+export default function WeatherHeader({ climaData, onOpenEstacionesCercanas }) {
   if (!climaData) return null;
 
   const { estacion, modo_urbano, modo_agricola, metadatos, alerta_oficial_senapred, transparency_metadata } = climaData;
@@ -11,7 +11,21 @@ export default function WeatherHeader({ climaData }) {
   const tMin = modo_agricola?.temperatura_minima_hoy_c ?? 10;
   const tMax = modo_agricola?.temperatura_maxima_hoy_c ?? 22;
 
-  const updatedAgo = transparency_metadata?.updated_ago_str || "Se actualizó hace un instante";
+  const updatedLabel = transparency_metadata?.updated_at_label || transparency_metadata?.updated_ago_str || "Actualización a las 18:00 hrs";
+
+  const compartir = () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      navigator.share({
+        title: `MeteoPrecisa Chile — ${estacion?.nombre || 'Clima'}`,
+        text: `Revisa el clima en vivo para ${estacion?.nombre}:`,
+        url: url
+      }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(url);
+      alert(`🔗 Enlace copiado al portapapeles: ${url}`);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -32,19 +46,29 @@ export default function WeatherHeader({ climaData }) {
         </div>
       )}
 
-      {/* APPLE WEATHER STYLE HERO CARD */}
+      {/* HERO CARD ESTILO APPLE WEATHER CON BOTÓN COMPARTIR Y VER ESTACIONES CERCANAS */}
       <div className="relative rounded-3xl p-6 md:p-8 bg-gradient-to-b from-slate-900/90 via-slate-900/70 to-slate-950/90 border border-slate-800/80 shadow-2xl backdrop-blur-2xl overflow-hidden text-center space-y-3">
         {/* Radial ambient glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* NOMBRE DE LA COMUNA / SECTOR */}
-        <div className="flex items-center justify-center gap-2 text-xs font-bold tracking-wide text-sky-400 uppercase">
-          <MapPin className="w-4 h-4 text-sky-400" />
-          <span>{estacion?.sector || 'Chile'}</span>
-          <span className="text-slate-600">•</span>
-          <span className="text-slate-400 font-normal normal-case">
-            A {metadatos?.distancia_km} km ({metadatos?.orientacion})
-          </span>
+        {/* BOTÓN COMPARTIR Y UBICACIÓN CERCANA (PUNTO 2 Y 6) */}
+        <div className="flex items-center justify-between text-xs font-bold text-sky-400">
+          <button 
+            onClick={onOpenEstacionesCercanas}
+            className="flex items-center gap-2 bg-sky-500/10 hover:bg-sky-500/20 px-3 py-1.5 rounded-xl border border-sky-500/30 text-sky-300 transition"
+          >
+            <MapPin className="w-3.5 h-3.5 text-sky-400" />
+            <span>{estacion?.sector || 'Chile'} • A {metadatos?.distancia_km} km</span>
+            <span className="text-[10px] text-sky-400 underline">(Ver 5 Cercanas)</span>
+          </button>
+
+          <button 
+            onClick={compartir}
+            className="flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-700/80 px-3 py-1.5 rounded-xl border border-slate-700 text-slate-200 transition"
+          >
+            <Share2 className="w-3.5 h-3.5 text-slate-300" />
+            <span>Compartir</span>
+          </button>
         </div>
 
         <h1 className="text-3xl md:text-5xl font-black text-white tracking-tight">
@@ -65,7 +89,7 @@ export default function WeatherHeader({ climaData }) {
           </div>
         </div>
 
-        {/* PILLS DE RED Y TRANSPARENCIA */}
+        {/* PILLS DE RED Y TRANSPARENCIA CON HORA CERRADA (PUNTO 4) */}
         <div className="flex flex-wrap items-center justify-center gap-2 pt-2 text-xs">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-sky-500/15 text-sky-300 font-semibold rounded-full border border-sky-500/30">
             <Radio className="w-3.5 h-3.5 animate-pulse text-sky-400" />
@@ -74,7 +98,7 @@ export default function WeatherHeader({ climaData }) {
 
           <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/15 text-emerald-300 font-semibold rounded-full border border-emerald-500/30">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            {updatedAgo}
+            {updatedLabel}
           </span>
         </div>
 

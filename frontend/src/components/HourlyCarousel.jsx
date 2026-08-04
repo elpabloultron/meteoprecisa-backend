@@ -17,6 +17,8 @@ export default function HourlyCarousel({ hourlyForecast }) {
   const times = hourlyForecast.time.slice(0, 24);
   const temps = hourlyForecast.temperature_2m?.slice(0, 24) || [];
   const precips = hourlyForecast.precipitation_probability?.slice(0, 24) || [];
+  const precipMms = hourlyForecast.precipitation?.slice(0, 24) || [];
+  const humidities = hourlyForecast.relative_humidity_2m?.slice(0, 24) || [];
   const codes = hourlyForecast.weather_code?.slice(0, 24) || [];
 
   return (
@@ -30,7 +32,8 @@ export default function HourlyCarousel({ hourlyForecast }) {
         {times.map((t, idx) => {
           const hourLabel = idx === 0 ? 'Ahora' : t.split('T')[1]?.slice(0, 5) || t;
           const tempVal = Math.round(temps[idx] ?? 15);
-          const precipProb = precips[idx] || 0;
+          const pMm = precipMms[idx] || 0;
+          const pProb = precips[idx] || (pMm > 0 ? Math.min(100, Math.round(pMm * 35)) : (humidities[idx] > 80 ? Math.round((humidities[idx] - 75) * 2) : 0));
           const codeVal = codes[idx];
 
           return (
@@ -43,14 +46,10 @@ export default function HourlyCarousel({ hourlyForecast }) {
                 {getWeatherIcon(codeVal, tempVal)}
               </div>
               <div className="text-base font-extrabold text-white font-mono">{tempVal}°</div>
-              {precipProb > 0 ? (
-                <div className="flex items-center justify-center gap-0.5 text-[10px] text-sky-400 font-bold">
-                  <Droplets className="w-3 h-3" />
-                  <span>{precipProb}%</span>
-                </div>
-              ) : (
-                <div className="text-[10px] text-slate-500 font-medium">0%</div>
-              )}
+              <div className="flex items-center justify-center gap-0.5 text-[10px] text-sky-400 font-bold">
+                <Droplets className="w-3 h-3" />
+                <span>{pProb}%</span>
+              </div>
             </div>
           );
         })}

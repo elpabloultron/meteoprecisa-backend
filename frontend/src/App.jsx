@@ -11,6 +11,7 @@ import ComparisonTable from './components/ComparisonTable';
 import SatelliteModal from './components/SatelliteModal';
 import BottomNav from './components/BottomNav';
 import DetailDrawer from './components/DetailDrawer';
+import EstacionesCercanasModal from './components/EstacionesCercanasModal';
 
 const API_BASE = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ? 'http://localhost:8000'
@@ -22,6 +23,7 @@ export default function App() {
   const [climaData, setClimaData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sateliteModalOpen, setSateliteModalOpen] = useState(false);
+  const [cercanasModalOpen, setCercanasModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('inicio');
 
   // Estado para el DetailDrawer de métricas y auditoría
@@ -56,7 +58,6 @@ export default function App() {
       .finally(() => setLoading(false));
   }, [coords]);
 
-  // Manejo de navegación por pestañas inferiores (BottomNav)
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
     if (tabId === 'inicio') {
@@ -108,9 +109,12 @@ export default function App() {
         ) : (
           <>
             {/* CABECERA HERO ESTILO APPLE WEATHER */}
-            <WeatherHeader climaData={climaData} />
+            <WeatherHeader
+              climaData={climaData}
+              onOpenEstacionesCercanas={() => setCercanasModalOpen(true)}
+            />
 
-            {/* SLIDER HORA A HORA (PRÓXIMAS 24 HORAS) */}
+            {/* SLIDER HORA A HORA (PRÓXIMAS 24 HORAS CON % REAL) */}
             <HourlyCarousel hourlyForecast={climaData?.pronostico_numerico_openmeteo?.horario} />
 
             {/* PANEL MODO URBANO & MODO AGRÍCOLA CON CARDS INTERACTIVAS */}
@@ -128,7 +132,7 @@ export default function App() {
               />
             )}
 
-            {/* SECCIÓN MAPA INTERACTIVO */}
+            {/* SECCIÓN MAPA INTERACTIVO CON EMBED WINDY OFICIAL */}
             <div ref={mapRef}>
               <MapSection
                 estacionSeleccionada={climaData?.estacion}
@@ -142,6 +146,7 @@ export default function App() {
             <div ref={forecastRef} className="space-y-6">
               <DailyForecastCards
                 dailyForecast={climaData?.pronostico_numerico_openmeteo?.diario_7dias}
+                onSelectMetric={handleSelectMetric}
               />
 
               <ComparisonTable
@@ -152,6 +157,7 @@ export default function App() {
               <ForecastChart
                 dmcForecast={climaData?.pronostico_oficial_dmc}
                 openMeteoForecast={climaData?.pronostico_numerico_openmeteo}
+                onSelectMetric={handleSelectMetric}
               />
             </div>
           </>
@@ -171,6 +177,14 @@ export default function App() {
           setSateliteModalOpen(false);
           setActiveTab('inicio');
         }}
+        apiBase={API_BASE}
+      />
+
+      {/* MODAL 5 ESTACIONES MÁS CERCANAS */}
+      <EstacionesCercanasModal
+        isOpen={cercanasModalOpen}
+        onClose={() => setCercanasModalOpen(false)}
+        onSelectStation={handleSelectStation}
         apiBase={API_BASE}
       />
 

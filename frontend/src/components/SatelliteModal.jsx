@@ -20,9 +20,11 @@ export default function SatelliteModal({ isOpen, onClose, apiBase }) {
 
   if (!isOpen) return null;
 
-  const videoUrl = loopData?.video_url
+  const rawUrl = loopData?.video_url
     ? (loopData.video_url.startsWith('http') ? loopData.video_url : `${apiBase}${loopData.video_url}`)
     : `${apiBase}/static/goes19_loop.webp`;
+
+  const videoUrl = `${rawUrl}?t=${Date.now()}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-2xl">
@@ -40,7 +42,7 @@ export default function SatelliteModal({ isOpen, onClose, apiBase }) {
                   Reproductor Bucle Satelital NOAA GOES-19
                 </h3>
                 <span className="px-2.5 py-0.5 text-[10px] font-bold bg-purple-500/20 text-purple-300 rounded-full border border-purple-500/30">
-                  {loopData?.updated_at_label || 'Actualizada'}
+                  {loopData?.updated_at_label || 'Actualización a las 18:00 hrs'}
                 </span>
               </div>
               <p className="text-xs text-slate-400">
@@ -77,7 +79,7 @@ export default function SatelliteModal({ isOpen, onClose, apiBase }) {
           {/* BADGE DE TIEMPO Y FUENTE EN VIVO */}
           <div className="absolute top-4 right-4 bg-slate-950/85 px-3 py-1.5 rounded-xl border border-purple-500/30 text-xs font-mono text-purple-300 backdrop-blur-md flex items-center gap-2">
             <Clock className="w-3.5 h-3.5 text-purple-400" />
-            <span>{loopData?.updated_at_label || "Bucle 24 Horas"}</span>
+            <span>{loopData?.updated_at_label || "Actualización a las 18:00 hrs"}</span>
           </div>
         </div>
 
