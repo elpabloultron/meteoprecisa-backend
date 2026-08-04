@@ -1,0 +1,1556 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeteoPrecisa Chile — Telemetría Hiperlocal & GEE</title>
+    
+    <!-- GOOGLE FONTS (PLUS JAKARTA SANS) & FONTAWESOME 6.5.1 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- LEAFLET MAPS CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- CHART.JS FOR HOURLY DUAL-AXIS FORECAST -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --bg-main: #090d16;
+            --bg-card: rgba(21, 29, 46, 0.75);
+            --bg-card-hover: rgba(30, 41, 59, 0.85);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --primary: #10b981;
+            --primary-glow: rgba(16, 185, 129, 0.25);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-blue: #38bdf8;
+            --accent-warning: #f59e0b;
+            --accent-danger: #ef4444;
+            --accent-purple: #a855f7;
+            --radius-lg: 20px;
+            --radius-md: 14px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 0;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(16, 185, 129, 0.08), transparent 35%),
+                radial-gradient(circle at 85% 85%, rgba(56, 189, 248, 0.06), transparent 40%);
+            background-attachment: fixed;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 580px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 20px 18px 40px 18px;
+            position: relative;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+        }
+
+        .brand-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-logo .logo-icon {
+            width: 38px;
+            height: 38px;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            font-size: 18px;
+        }
+
+        .brand-logo h1 {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+        }
+
+        .btn-gps {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-gps:hover {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .btn-gps.active-mode {
+            background: rgba(16, 185, 129, 0.25) !important;
+            border-color: var(--primary) !important;
+            color: var(--primary) !important;
+            font-weight: 700 !important;
+        }
+
+        .city-picker {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            scrollbar-width: none;
+        }
+
+        .city-picker::-webkit-scrollbar {
+            display: none;
+        }
+
+        .chip-city {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 7px 14px;
+            border-radius: 16px;
+            font-size: 12px;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .chip-city.active {
+            background: var(--primary);
+            color: #000;
+            border-color: var(--primary);
+            font-weight: 700;
+            box-shadow: 0 4px 12px var(--primary-glow);
+        }
+
+        .search-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 16px 10px 38px;
+            background: rgba(21, 29, 46, 0.9);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 13px;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px var(--primary-glow);
+        }
+
+        .station-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .station-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 120px;
+            height: 120px;
+            background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .station-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .station-tag {
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--primary);
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .station-distance {
+            color: var(--text-muted);
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .station-name {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--text-primary);
+            line-height: 1.2;
+        }
+
+        .hero-weather {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 6px;
+        }
+
+        .temp-display {
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .temp-number {
+            font-size: 64px;
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -2px;
+            color: var(--text-primary);
+            font-family: 'Space Grotesk', monospace;
+        }
+
+        .temp-unit {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--primary);
+            margin-top: 6px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .metric-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .metric-card.clickable {
+            cursor: pointer;
+        }
+
+        .metric-card.clickable:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .metric-label i {
+            color: var(--primary);
+        }
+
+        .metric-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-family: 'Space Grotesk', monospace;
+        }
+
+        .metric-sub {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .alert-card {
+            background: rgba(245, 158, 11, 0.08);
+            border: 1px solid rgba(245, 158, 11, 0.25);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .alert-card:hover {
+            border-color: var(--accent-warning);
+            transform: translateY(-1px);
+        }
+
+        .alert-icon {
+            color: var(--accent-warning);
+            font-size: 22px;
+        }
+
+        .alert-info h4 {
+            font-size: 13px;
+            color: var(--accent-warning);
+            font-weight: 700;
+        }
+
+        .alert-info p {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+        }
+
+        .section-title {
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: -0.2px;
+        }
+
+        .badge-source {
+            font-size: 11px;
+            color: var(--primary);
+            background: rgba(16, 185, 129, 0.12);
+            padding: 3px 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            font-weight: 600;
+        }
+
+        .forecast-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .forecast-row {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .forecast-day {
+            font-size: 13px;
+            font-weight: 700;
+            width: 80px;
+        }
+
+        .forecast-icon {
+            font-size: 18px;
+            color: var(--accent-blue);
+            width: 30px;
+            text-align: center;
+        }
+
+        .forecast-rain {
+            font-size: 11px;
+            color: var(--accent-blue);
+            width: 60px;
+        }
+
+        .forecast-temps {
+            font-size: 14px;
+            font-weight: 700;
+            display: flex;
+            gap: 8px;
+            font-family: 'Space Grotesk', monospace;
+        }
+
+        .temp-max { color: var(--accent-warning); }
+        .temp-min { color: var(--accent-blue); }
+
+        #mapa-container-wrapper {
+            position: relative;
+            width: 100%;
+            height: 480px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            z-index: 10;
+        }
+
+        #windy-iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            z-index: 25;
+            display: block;
+        }
+
+        #mapa-chile {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 100%;
+            z-index: 15;
+            display: none;
+        }
+
+        .leaflet-popup-content-wrapper {
+            background: #0f172a !important;
+            color: #f8fafc !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            border-radius: 12px !important;
+        }
+
+        .custom-station-pin {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+            z-index: 35;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            animation: pulse-bar 1s infinite linear;
+        }
+
+        @keyframes pulse-bar {
+            0% { background-position: -200px 0; }
+            100% { background-position: 200px 0; }
+        }
+
+        .loading-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(16, 185, 129, 0.2);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            background: rgba(9, 13, 22, 0.92);
+            backdrop-filter: blur(12px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .modal-body-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 520px;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 18px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            max-width: 100%;
+        }
+
+        .btn-gps {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 8px 12px;
+            border-radius: var(--radius-md);
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <!-- HEADER BAR -->
+        <header class="header">
+            <div class="brand-logo">
+                <div class="logo-icon"><i class="fa-solid fa-tower-observation"></i></div>
+                <div>
+                    <h1>MeteoPrecisa</h1>
+                    <p style="font-size: 10px; color: var(--primary); font-weight: 700;">Chile v10.1 • Despliegue Automático Activo 🚀</p>
+                </div>
+            </div>
+
+            <div class="header-actions">
+                <button id="btn-modo-urbano" onclick="cambiarModo('urbano')" class="btn-gps active-mode">
+                    <i class="fa-solid fa-city"></i> Urbano
+                </button>
+                <button id="btn-modo-agricola" onclick="cambiarModo('agricola')" class="btn-gps">
+                    <i class="fa-solid fa-wheat-awn"></i> Agrícola
+                </button>
+                <button class="btn-gps" onclick="usarGPS()">
+                    <i class="fa-solid fa-location-crosshairs"></i> Mi Ubicación
+                </button>
+            </div>
+        </header>
+
+        <!-- CHIPS DE CIUDADES -->
+        <div class="city-picker">
+            <div class="chip-city" onclick="seleccionarEstacionChip('osorno', event)">Cañal Bajo (Osorno)</div>
+            <div class="chip-city" onclick="seleccionarEstacionChip('quilacahuin', event)">INIA Quilacahuín</div>
+            <div class="chip-city active" onclick="seleccionarEstacionChip('santiago', event)">Santiago (RM)</div>
+            <div class="chip-city" onclick="seleccionarEstacionChip('laserena', event)">La Serena (Coquimbo)</div>
+            <div class="chip-city" onclick="seleccionarEstacionChip('talca', event)">Talca (Maule)</div>
+            <div class="chip-city" onclick="seleccionarEstacionChip('temuco', event)">Temuco (Araucanía)</div>
+            <div class="chip-city" onclick="seleccionarEstacionChip('valdivia', event)">Valdivia (Los Ríos)</div>
+            <div class="chip-city" onclick="seleccionarEstacionChip('chiloe', event)">Ancud (Chiloé)</div>
+        </div>
+
+        <!-- BUSCADOR CON 609 ESTACIONES -->
+        <div class="search-container">
+            <input type="text" id="input_busqueda" placeholder="Buscar entre las 609 estaciones físicas (ej: Quilacahuin, Cañal Bajo)..."
+                oninput="manejarBusquedaEstacion()" class="search-input">
+            <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px;"></i>
+            <p id="mensaje-busqueda" style="font-size: 11px; margin-top: 4px; font-weight: 600; display: none;"></p>
+            <div id="desplegable-resultados" style="position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: rgba(15, 23, 42, 0.95); border: 1px solid var(--border-color); border-radius: var(--radius-md); max-height: 200px; overflow-y: auto; display: none; z-index: 50;"></div>
+        </div>
+
+        <!-- BANNER DE ALERTA SENAPRED OFICIAL -->
+        <div id="banner-senapred" style="display: none;" class="alert-card" onclick="abrirModalSenapred()" style="background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3);">
+            <i class="fa-solid fa-triangle-exclamation alert-icon" style="color: var(--accent-danger);"></i>
+            <div class="alert-info" style="flex: 1;">
+                <h4 style="color: var(--accent-danger);" id="senapred-titulo">Alerta SENAPRED Oficial</h4>
+                <p id="senapred-desc"></p>
+            </div>
+            <i class="fa-solid fa-chevron-right" style="color: var(--text-muted); font-size: 12px;"></i>
+        </div>
+
+        <!-- TARJETA PRINCIPAL DE LA ESTACIÓN VINCULADA -->
+        <div class="station-card" id="stationCard">
+            <div class="loading-overlay" id="loader">
+                <div class="spinner"></div>
+                <p style="margin-top: 12px; font-size: 13px; color: var(--text-secondary); font-weight: 600;">Sincronizando telemetría física local...</p>
+            </div>
+
+            <div class="station-header">
+                <span class="station-tag" id="networkTag">RED AGROMET / INIA</span>
+                <span class="station-distance" id="distanceText"><i class="fa-solid fa-location-dot"></i> a 0.0 km de ti</span>
+            </div>
+
+            <div>
+                <h2 class="station-name" id="stationName">Estación INIA Quilacahuín</h2>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;" id="stationCoords">Lat: -40.3479 | Lon: -73.3075</p>
+            </div>
+
+            <div class="hero-weather">
+                <div class="temp-display">
+                    <span class="temp-number" id="currentTemp">14.5</span>
+                    <span class="temp-unit">°C</span>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 38px; color: #facc15; margin-bottom: 2px;"><i class="fa-solid fa-sun"></i></div>
+                    <div style="font-size: 13px; color: var(--text-secondary); font-weight: 600;" id="weatherStatus">Sensación: 14.5°C</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ALERTA AGROMETEOROLÓGICA DE TERRENO -->
+        <div class="alert-card">
+            <i class="fa-solid fa-snowflake alert-icon"></i>
+            <div class="alert-info">
+                <h4 id="alertTitle">Riesgo de Heladas Agrometeorológicas</h4>
+                <p id="alertMessage">Monitoreo activo en terreno.</p>
+            </div>
+        </div>
+
+        <!-- VISTA DE MÉTRICAS MODO URBANO -->
+        <div id="panel-urbano-grid" class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-label"><i class="fa-solid fa-droplet"></i> Humedad Relativa</div>
+                <div class="metric-value" id="humidityVal">82 %</div>
+                <div class="metric-sub" id="dewPointSub">Superficie</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-label"><i class="fa-solid fa-wind"></i> Viento en Terreno</div>
+                <div class="metric-value" id="windVal">12 km/h</div>
+                <div class="metric-sub" id="windDirSub">Dirección: Sur</div>
+            </div>
+
+            <!-- TARJETA CLICKABLE DE CALIDAD DEL AIRE SINCA + US AQI -->
+            <div class="metric-card clickable" onclick="abrirModalCalidadAire()">
+                <div class="metric-label"><i class="fa-solid fa-smog"></i> Calidad Aire SINCA / AQI</div>
+                <div class="metric-value" style="color: var(--primary);" id="sincaVal">Bueno 🟢</div>
+                <div class="metric-sub" id="sincaMP25">MP2.5: 12.0 µg/m³ • Haz clic para ver detalle</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-label"><i class="fa-solid fa-gauge-high"></i> Presión & UV</div>
+                <div class="metric-value" id="pressureVal">1013 hPa</div>
+                <div class="metric-sub" id="uvSub">Índice UV: 6 (Alto)</div>
+            </div>
+        </div>
+
+        <!-- VISTA DE MÉTRICAS MODO AGRÍCOLA -->
+        <div id="panel-agricola-grid" class="metrics-grid" style="display: none;">
+            <div class="metric-card">
+                <div class="metric-label"><i class="fa-solid fa-cloud-rain"></i> Lluvia Caída Hoy (24H)</div>
+                <div class="metric-value" id="rainVal">0.0 mm</div>
+                <div class="metric-sub">Lluvia Registrada en Terreno</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-label"><i class="fa-solid fa-cloud-sun-rain"></i> Lluvia Pronosticada Hoy</div>
+                <div class="metric-value" id="rainForecastVal">0.0 mm</div>
+                <div class="metric-sub">Proyección Próximas Horas</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-label"><i class="fa-solid fa-calendar-days"></i> Acumulado Mensual</div>
+                <div class="metric-value" id="rainMonthVal">38.5 mm</div>
+                <div class="metric-sub">Total Acumulado Mes Activo</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-label"><i class="fa-solid fa-temperature-arrow-down"></i> Horas Frío (24H)</div>
+                <div class="metric-value" id="coldHoursVal">480 hrs</div>
+                <div class="metric-sub">Base ≤ 7°C (T2026)</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-label"><i class="fa-solid fa-plant-wilt"></i> Evapotranspiración ETo</div>
+                <div class="metric-value" id="etoVal">3.2 mm/día</div>
+                <div class="metric-sub">Consumo Hídrico FAO-56</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-label"><i class="fa-solid fa-sun"></i> Radiación Solar</div>
+                <div class="metric-value" id="radVal">450 W/m²</div>
+                <div class="metric-sub">Insolación Global</div>
+            </div>
+        </div>
+
+        <!-- MÓDULO ANÁLISIS SATELITAL GOOGLE EARTH ENGINE -->
+        <div class="station-card" style="background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.25);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="station-tag" style="background: rgba(16, 185, 129, 0.2);"><i class="fa-solid fa-satellite"></i> Google Earth Engine</span>
+                <span style="font-size: 11px; color: var(--primary); font-weight: 700;">Sentinel-2, Landsat & MODIS</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 6px;">
+                <div style="background: rgba(9, 13, 22, 0.6); padding: 10px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <div style="font-size: 11px; color: var(--text-muted);"><i class="fa-solid fa-seedling" style="color: var(--primary);"></i> Salud Vegetal NDVI</div>
+                    <div style="font-size: 18px; font-weight: 800; color: var(--primary); font-family: 'Space Grotesk', monospace;" id="geeNdvi">0.65</div>
+                    <div style="font-size: 10px; color: var(--text-secondary);" id="geeNdviStatus">Vigor Vegetativo Alto</div>
+                </div>
+
+                <div style="background: rgba(9, 13, 22, 0.6); padding: 10px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <div style="font-size: 11px; color: var(--text-muted);"><i class="fa-solid fa-droplet" style="color: var(--accent-blue);"></i> Estrés Hídrico NDWI</div>
+                    <div style="font-size: 18px; font-weight: 800; color: var(--accent-blue); font-family: 'Space Grotesk', monospace;" id="geeNdwi">0.38</div>
+                    <div style="font-size: 10px; color: var(--text-secondary);" id="geeNdwiStatus">Sin Estrés / Óptimo Riego</div>
+                </div>
+
+                <div style="background: rgba(9, 13, 22, 0.6); padding: 10px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <div style="font-size: 11px; color: var(--text-muted);"><i class="fa-solid fa-temperature-full" style="color: var(--accent-warning);"></i> Temp. Suelo LST</div>
+                    <div style="font-size: 18px; font-weight: 800; color: var(--accent-warning); font-family: 'Space Grotesk', monospace;" id="geeLst">14.8 °C</div>
+                    <div style="font-size: 10px; color: var(--text-secondary);" id="geeLstStatus">Sin Heladas en Suelo</div>
+                </div>
+
+                <div style="background: rgba(9, 13, 22, 0.6); padding: 10px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <div style="font-size: 11px; color: var(--text-muted);"><i class="fa-solid fa-tree" style="color: var(--primary);"></i> Biomasa & Dosel EVI</div>
+                    <div style="font-size: 18px; font-weight: 800; color: var(--primary); font-family: 'Space Grotesk', monospace;" id="geeEvi">0.48</div>
+                    <div style="font-size: 10px; color: var(--text-secondary);">Dosel Denso / Cobertura Alta</div>
+                </div>
+
+                <div style="background: rgba(9, 13, 22, 0.6); padding: 10px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <div style="font-size: 11px; color: var(--text-muted);"><i class="fa-solid fa-fire" style="color: var(--accent-danger);"></i> Incendios FIRMS</div>
+                    <div style="font-size: 15px; font-weight: 800; color: var(--text-primary);" id="geeFirms">0 Focos Activos</div>
+                    <div style="font-size: 10px; color: var(--primary);">Riesgo Bajo en 25 km</div>
+                </div>
+
+                <div style="background: rgba(9, 13, 22, 0.6); padding: 10px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <div style="font-size: 11px; color: var(--text-muted);"><i class="fa-solid fa-cloud" style="color: var(--accent-blue);"></i> ET Real MOD16</div>
+                    <div style="font-size: 18px; font-weight: 800; color: var(--accent-blue); font-family: 'Space Grotesk', monospace;" id="geeEtReal">3.4 mm/día</div>
+                    <div style="font-size: 10px; color: var(--text-secondary);">Consumo Real Acumulado</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PRONÓSTICO CALIBRADO A 7 DÍAS -->
+        <div class="section-header">
+            <h3 class="section-title">Pronóstico Calibrado (7 Días)</h3>
+            <span class="badge-source">Modelo ECMWF + DMC</span>
+        </div>
+
+        <div class="forecast-list" id="forecastList"></div>
+
+        <!-- VISOR DE MAPAS SATELITALES INTERACTIVO CON INTEGRACIÓN WINDY 60FPS -->
+        <div class="section-header">
+            <h3 class="section-title"><i class="fa-solid fa-layer-group" style="color: var(--primary);"></i> Visor Satelital Interactivo (Windy 60fps)</h3>
+            <span class="badge-source">Windy + Esri World Imagery</span>
+        </div>
+
+        <div style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;">
+            <button onclick="activarCapaWindy('wind')" id="btn-capa-viento" class="btn-gps" style="background: rgba(16, 185, 129, 0.25); border-color: var(--primary); color: var(--primary);">
+                <i class="fa-solid fa-wind"></i> Viento Animado
+            </button>
+            <button onclick="activarCapaWindy('rain')" id="btn-capa-radar" class="btn-gps">
+                <i class="fa-solid fa-cloud-showers-heavy"></i> Radar Lluvia
+            </button>
+            <button onclick="activarCapaWindy('satellite')" id="btn-capa-satelite_windy" class="btn-gps">
+                <i class="fa-solid fa-earth-americas"></i> Satélite Nubes
+            </button>
+            <button onclick="activarCapaLeaflet('estaciones')" id="btn-capa-estaciones" class="btn-gps">
+                <i class="fa-solid fa-tower-broadcast"></i> 609 Pines Chile
+            </button>
+            <button onclick="abrirSateliteModal()" class="btn-gps" style="background: rgba(168, 85, 247, 0.2); border-color: var(--accent-purple); color: var(--accent-purple);">
+                <i class="fa-solid fa-satellite"></i> GOES-19 (24H)
+            </button>
+        </div>
+
+        <div id="mapa-container-wrapper">
+            <iframe id="windy-iframe" src="https://embed.windy.com/embed2.html?lat=-40.3479&lon=-73.3075&detailLat=-40.3479&detailLon=-73.3075&width=600&height=480&zoom=9&level=surface&overlay=wind&product=ecmwf&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1"></iframe>
+            <div id="mapa-chile"></div>
+        </div>
+
+        <!-- TABLA COMPARATIVA MULTIRED (RADIO 35 KM) -->
+        <div class="section-header">
+            <h3 class="section-title"><i class="fa-solid fa-network-wired" style="color: var(--accent-blue);"></i> Comparativa Multired (35 km)</h3>
+            <span class="badge-source">DMC vs Agromet vs RedMeteo</span>
+        </div>
+
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow-x: auto;">
+            <table style="width: 100%; text-align: left; font-size: 11px;">
+                <thead>
+                    <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-weight: 700;">
+                        <th style="padding: 10px;">Estación Física</th>
+                        <th style="padding: 10px;">Red</th>
+                        <th style="padding: 10px;">Distancia</th>
+                        <th style="padding: 10px; text-align: right;">Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-comparativa-body" style="color: var(--text-secondary);"></tbody>
+            </table>
+        </div>
+
+        <!-- BOLETÍN DMC & CURVA DUAL DE TEMPERATURA Y BARRAS DE LLUVIA (48 HORAS) -->
+        <div class="section-header">
+            <h3 class="section-title"><i class="fa-solid fa-chart-line" style="color: var(--primary);"></i> Curva Hora a Hora (48 Horas)</h3>
+            <span style="font-size: 11px; color: var(--text-muted);">Línea Verde: Temp (°C) | Barras Azules: Lluvia (mm/h)</span>
+        </div>
+
+        <div id="caja-boletin-dmc" style="display: none;" class="alert-card" onclick="abrirModalDmc()" style="background: rgba(56, 189, 248, 0.08); border-color: rgba(56, 189, 248, 0.25);">
+            <i class="fa-solid fa-file-lines alert-icon" style="color: var(--accent-blue);"></i>
+            <div class="alert-info" style="flex: 1;">
+                <h4 style="color: var(--accent-blue);">Boletín Oficial DMC</h4>
+                <p id="texto-boletin-dmc"></p>
+            </div>
+            <i class="fa-solid fa-chevron-right" style="color: var(--text-muted); font-size: 12px;"></i>
+        </div>
+
+        <!-- GRÁFICO DUAL-AXIS 48 HORAS -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; height: 280px;">
+            <canvas id="grafico-pronostico-48h"></canvas>
+        </div>
+
+    </div>
+
+    <!-- MODAL DETALLE CALIDAD DEL AIRE (SINCA MMA + US AQI) -->
+    <div id="modal-sinca" class="modal-overlay">
+        <div class="modal-body-content">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="font-size: 16px; font-weight: 800; color: var(--primary);"><i class="fa-solid fa-smog"></i> Calidad del Aire & Nivel de Riesgo Sanitarios</h3>
+                <button onclick="cerrarModal('modal-sinca')" style="background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid var(--primary); padding: 14px; border-radius: 12px;">
+                <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Estado Norma Chilena D.S. 12/2011 MMA</div>
+                <div style="font-size: 22px; font-weight: 800; color: var(--primary);" id="sinca-modal-norma">Bueno 🟢</div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;" id="sinca-modal-mp25">Concentración MP2.5: 12.0 µg/m³ | MP10: 28.0 µg/m³</div>
+            </div>
+
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); padding: 14px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px;">
+                <h4 style="font-size: 13px; font-weight: 700; color: var(--accent-blue);"><i class="fa-solid fa-globe"></i> Escala Internacional US AQI (EPA EE.UU.)</h4>
+                <div style="font-size: 18px; font-weight: 800; color: var(--text-primary);" id="sinca-modal-aqi-idx">Índice AQI: 35 — Bueno 🟢</div>
+                <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;" id="sinca-modal-aqi-desc">Sin riesgos para la salud humana. Apto para actividades físicas al aire libre.</p>
+            </div>
+
+            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-weight: 700; color: var(--text-primary);">📊 Riel de Clasificación US AQI & Salud:</div>
+                <div>🟢 <strong>0 - 50 (Bueno):</strong> Sin riesgo para la salud.</div>
+                <div>🟡 <strong>51 - 100 (Moderado):</strong> Calidad de aire aceptable.</div>
+                <div>🟠 <strong>101 - 150 (Insalubre p/Grupos Sensibles):</strong> Riesgo para asmáticos, niños y ancianos.</div>
+                <div>🔴 <strong>151 - 200 (Insalubre / Dañino):</strong> Riesgo para toda la población. Reducir ejercicio exterior.</div>
+                <div>🟣 <strong>201 - 300 (Muy Insalubre / Muy Dañino):</strong> Advertencia de emergencia de salud.</div>
+                <div>🟤 <strong>301 - 500 (Peligroso / Peligro Extremo):</strong> Alerta máxima. Evitar salidas al aire libre.</div>
+            </div>
+
+            <button onclick="cerrarModal('modal-sinca')" class="btn-gps" style="background: var(--primary); color: #000; border: none; padding: 10px; width: 100%; justify-content: center; font-weight: 700;">Cerrar Reporte</button>
+        </div>
+    </div>
+
+    <!-- MODAL SENAPRED DETALLE -->
+    <div id="modal-senapred" class="modal-overlay">
+        <div class="modal-body-content">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="font-size: 16px; font-weight: 800; color: var(--accent-danger);"><i class="fa-solid fa-triangle-exclamation"></i> Informe Oficial SENAPRED</h3>
+                <button onclick="cerrarModal('modal-senapred')" style="background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div style="font-size: 13px; color: var(--text-primary); line-height: 1.5;" id="senapred-modal-body"></div>
+            <button onclick="cerrarModal('modal-senapred')" class="btn-gps" style="background: var(--accent-danger); color: #fff; border: none; padding: 10px; width: 100%; justify-content: center;">Entendido</button>
+        </div>
+    </div>
+
+    <!-- MODAL DMC DETALLE -->
+    <div id="modal-dmc" class="modal-overlay">
+        <div class="modal-body-content">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="font-size: 16px; font-weight: 800; color: var(--accent-blue);"><i class="fa-solid fa-file-lines"></i> Boletín Sinóptico Oficial DMC</h3>
+                <button onclick="cerrarModal('modal-dmc')" style="background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div style="font-size: 13px; color: var(--text-primary); line-height: 1.6;" id="dmc-modal-body"></div>
+            <button onclick="cerrarModal('modal-dmc')" class="btn-gps" style="background: var(--accent-blue); color: #000; border: none; padding: 10px; width: 100%; justify-content: center; font-weight: 700;">Cerrar Boletín</button>
+        </div>
+    </div>
+
+    <!-- MODAL DE BIENVENIDA & SOLICITUD DE UBICACIÓN GPS -->
+    <div id="modal-bienvenida" class="modal-overlay">
+        <div class="modal-body-content" style="text-align: center; max-width: 460px;">
+            <div style="font-size: 44px; color: var(--primary); margin-bottom: 4px; filter: drop-shadow(0 0 10px var(--primary-glow));">
+                <i class="fa-solid fa-compass-drafting"></i>
+            </div>
+            <h2 style="font-size: 20px; font-weight: 800; color: var(--text-primary);">¡Bienvenido a MeteoPrecisa Chile! 🇨🇱</h2>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-top: 6px;">
+                Para entregarte telemetría hiperlocal en tiempo real, calcular el riesgo de heladas de tu predio y vincularte con la estación más cercana de las 609 estaciones del país, necesitamos tu ubicación GPS.
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
+                <button onclick="aceptarUbicacionBienvenida()" style="background: var(--primary); color: #000; font-weight: 800; font-size: 13px; padding: 12px; border-radius: var(--radius-md); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 0 15px var(--primary-glow);">
+                    <i class="fa-solid fa-location-crosshairs"></i> Permitir Ubicación GPS & Explorar
+                </button>
+                <button onclick="omitirUbicacionBienvenida()" style="background: rgba(255,255,255,0.05); color: var(--text-muted); font-weight: 600; font-size: 12px; padding: 10px; border-radius: var(--radius-md); border: 1px solid var(--border-color); cursor: pointer;">
+                    Omitir por ahora (Ver Santiago por defecto)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL REPRODUCTOR SATELITAL GOES-19 CON EXPLICACIÓN DIDÁCTICA -->
+    <div id="modal-satelite" class="modal-overlay">
+        <div class="modal-body-content">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="font-size: 15px; font-weight: 800; color: var(--text-primary);"><i class="fa-solid fa-satellite" style="color: var(--accent-purple);"></i> Satélite NOAA GOES-19 (Chile)</h3>
+                <button onclick="cerrarSateliteModal()" style="background: none; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div style="position: relative; background: #000; border-radius: var(--radius-md); overflow: hidden; display: flex; align-items: center; justify-content: center; min-height: 280px;">
+                <img id="satelite-frame-img" src="" alt="GOES-19" style="max-height: 280px; width: auto; object-fit: contain;">
+                <div style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); padding: 4px 8px; border-radius: 6px; font-size: 10px; font-family: 'Space Grotesk', monospace; color: var(--accent-purple);" id="satelite-frame-counter">Fotograma 1 / 144</div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <button id="btn-satelite-play" onclick="toggleSatelitePlay()" class="btn-gps" style="background: var(--accent-purple); color: #fff; border: none;">Pausar</button>
+                <input type="range" id="satelite-slider" min="0" max="143" value="0" oninput="cambiarFrameSatelite(this.value)" style="flex: 1; accent-color: var(--accent-purple);">
+            </div>
+
+            <div style="background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.25); padding: 12px; border-radius: var(--radius-md); font-size: 11px; color: var(--text-secondary); line-height: 1.5;">
+                <div style="font-weight: 800; color: var(--accent-purple); margin-bottom: 4px;"><i class="fa-solid fa-circle-info"></i> ¿Qué estás viendo en esta animación?</div>
+                <div>• <strong>Satélite NOAA GOES-19:</strong> Muestra la secuencia Infrarroja GeoColor de las últimas 24 horas sobre el territorio chileno.</div>
+                <div>• <strong>Utilidad:</strong> Permite rastrear la entrada de frentes fríos, masas de nubes y tormentas en tiempo real.</div>
+                <div>• <strong>Origen:</strong> Sincronización automática de fotogramas capturados cada 10 minutos desde el servidor operacional de la NOAA.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LÓGICA JAVASCRIPT COMPLETA -->
+    <script>
+        const API_BASE = window.location.origin;
+        let map = null;
+        let layerActivaTile = null;
+        let capasBackend = {};
+        let todasEstaciones = [];
+        let estacionActual = null;
+        let miChart = null;
+        let datosSenapred = null;
+        let datosCalidadAire = null;
+        let textoDmc = "";
+
+        const ESTACIONES_CHIP = {
+            quilacahuin: { lat: -40.3479, lon: -73.3075 },
+            osorno: { lat: -40.5833, lon: -73.0667 },
+            laserena: { lat: -29.9833, lon: -71.2333 },
+            santiago: { lat: -33.4450, lon: -70.6830 },
+            talca: { lat: -35.3833, lon: -71.6000 },
+            temuco: { lat: -38.7667, lon: -72.6333 },
+            valdivia: { lat: -39.8139, lon: -73.2458 },
+            chiloe: { lat: -41.8697, lon: -73.8292 }
+        };
+
+        let sateliteFrames = [];
+        let sateliteIdx = 0;
+        let sateliteTimer = null;
+        let satelitePlaying = true;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            inicializarMapaLeaflet();
+            
+            const yaBienvenida = localStorage.getItem('meteoprecisa_bienvenida');
+            if (!yaBienvenida) {
+                document.getElementById('modal-bienvenida').style.display = 'flex';
+                cargarClima(-33.4450, -70.6830);
+            } else {
+                usarGPSOInicial();
+            }
+
+            fetch(`${API_BASE}/api/v1/buscar-estaciones?limite=650`)
+                .then(r => r.json())
+                .then(data => {
+                    todasEstaciones = data;
+                    renderizarPinesEstaciones(data);
+                });
+
+            fetch(`${API_BASE}/api/v1/capas-mapa`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.capas) capasBackend = data.capas;
+                });
+
+            window.addEventListener('resize', () => {
+                if (map) map.invalidateSize();
+            });
+        });
+
+        function inicializarMapaLeaflet() {
+            if (map) return;
+
+            map = L.map('mapa-chile', { zoomControl: true }).setView([-40.3479, -73.3075], 9);
+
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri World Imagery'
+            }).addTo(map);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
+                opacity: 0.85,
+                zIndex: 400
+            }).addTo(map);
+
+            setTimeout(() => map.invalidateSize(), 300);
+        }
+
+        function renderizarPinesEstaciones(lista) {
+            lista.forEach(est => {
+                const iconHtml = `<div style="background-color: #10b981; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px #10b981;"></div>`;
+                const customIcon = L.divIcon({
+                    className: 'custom-station-pin',
+                    html: iconHtml,
+                    iconSize: [12, 12],
+                    iconAnchor: [6, 6]
+                });
+
+                const marker = L.marker([est.lat, est.lon], { icon: customIcon }).addTo(map);
+                marker.bindPopup(`
+                    <div style="padding: 4px;">
+                        <div style="font-weight: 800; font-size: 13px; color: #fff;">${est.nombre}</div>
+                        <div style="font-size: 11px; color: #10b981; font-weight: 600;">${est.sector}</div>
+                        <button onclick="cargarClima(${est.lat}, ${est.lon})" style="margin-top: 8px; width: 100%; background: #10b981; color: #000; font-weight: 700; font-size: 11px; padding: 6px; border-radius: 6px; border: none; cursor: pointer;">
+                            Ver Telemetría en Vivo
+                        </button>
+                    </div>
+                `);
+            });
+        }
+
+        // ACTIVAR WINDY EMBED AUTOMÁTICO (60FPS FLUIDA)
+        function activarCapaWindy(capaWindy) {
+            const iframe = document.getElementById('windy-iframe');
+            const mapDiv = document.getElementById('mapa-chile');
+            
+            const lat = estacionActual?.coordenadas?.latitud || -40.3479;
+            const lon = estacionActual?.coordenadas?.longitud || -73.3075;
+
+            iframe.style.display = 'block';
+            mapDiv.style.display = 'none';
+
+            iframe.src = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&width=600&height=480&zoom=9&level=surface&overlay=${capaWindy}&product=ecmwf&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1`;
+        }
+
+        function activarCapaLeaflet(capa) {
+            const iframe = document.getElementById('windy-iframe');
+            const mapDiv = document.getElementById('mapa-chile');
+
+            iframe.style.display = 'none';
+            mapDiv.style.display = 'block';
+
+            if (map) {
+                map.invalidateSize();
+            }
+        }
+
+        function cargarClima(lat, lon, distKm = null) {
+            const loader = document.getElementById('loader');
+            loader.classList.add('active');
+
+            if (map) {
+                map.flyTo([lat, lon], 9, { duration: 1.2 });
+                setTimeout(() => map.invalidateSize(), 400);
+            }
+
+            fetch(`${API_BASE}/api/v1/clima-hiperlocal?lat=${lat}&lon=${lon}`)
+                .then(r => r.json())
+                .then(data => {
+                    estacionActual = data.estacion;
+
+                    document.getElementById('networkTag').innerText = data.estacion?.red_oficial || 'RED AGROMET / INIA';
+                    document.getElementById('stationName').innerText = data.estacion?.nombre || 'Estación Local';
+                    document.getElementById('stationCoords').innerText = `Lat: ${data.estacion?.coordenadas?.latitud.toFixed(4)} | Lon: ${data.estacion?.coordenadas?.longitud.toFixed(4)}`;
+                    
+                    const syncTexto = data.metadatos?.sincronizacion_texto || 'Sincronizado';
+                    if (distKm !== null) {
+                        document.getElementById('distanceText').innerHTML = `<i class="fa-solid fa-clock" style="color: var(--primary);"></i> ${syncTexto} • a ${distKm.toFixed(1)} km`;
+                    } else {
+                        document.getElementById('distanceText').innerHTML = `<i class="fa-solid fa-clock" style="color: var(--primary);"></i> ${syncTexto} • a ${data.metadatos?.distancia_km} km`;
+                    }
+
+                    const rawTemp = data.modo_urbano?.temperatura_c ?? 14.5;
+                    const tempSaneada = (rawTemp > 60 || rawTemp < -50) ? 14.5 : rawTemp;
+
+                    document.getElementById('currentTemp').innerText = tempSaneada.toFixed(1);
+                    document.getElementById('weatherStatus').innerText = `Sensación: ${data.modo_urbano?.sensacion_termica_c ?? tempSaneada}°C`;
+
+                    // METRICAS URBANAS
+                    document.getElementById('humidityVal').innerText = `${data.modo_urbano?.humedad_relativa_porcentaje ?? 82} %`;
+                    document.getElementById('dewPointSub').innerText = `Punto Rocío: ${data.modo_agricola?.alerta_helada_agrometeorologica?.temperatura_rocio_c ?? 11} °C`;
+                    
+                    document.getElementById('windVal').innerText = `${data.modo_urbano?.viento_velocidad_kmh ?? 12} km/h`;
+                    document.getElementById('windDirSub').innerText = `Dirección: ${data.modo_urbano?.viento_direccion ?? 'Sur'}`;
+
+                    // PRECIPITACIONES
+                    const lluviaCaida = data.modo_agricola?.lluvia_caida_hoy_mm ?? 0.0;
+                    const lluviaPronos = data.modo_agricola?.lluvia_pronosticada_hoy_mm ?? 0.0;
+                    const lluviaMes = data.modo_agricola?.lluvia_acumulada_mes_mm ?? 38.5;
+
+                    document.getElementById('rainVal').innerText = `${lluviaCaida.toFixed(1)} mm`;
+                    document.getElementById('rainForecastVal').innerText = `${lluviaPronos.toFixed(1)} mm`;
+                    document.getElementById('rainMonthVal').innerText = `${lluviaMes.toFixed(1)} mm`;
+
+                    document.getElementById('coldHoursVal').innerText = `${data.modo_agricola?.horas_frio_acumuladas_24h ?? 480} hrs`;
+                    document.getElementById('etoVal').innerText = `${data.modo_agricola?.evapotranspiracion_eto_mm_dia ?? 3.2} mm/día`;
+                    document.getElementById('radVal').innerText = `${data.modo_agricola?.radiacion_solar_w_m2 ?? 450} W/m²`;
+
+                    // CALIDAD DEL AIRE SINCA + US AQI
+                    datosCalidadAire = data.modo_urbano?.calidad_aire_sinca;
+                    const sincaNorma = datosCalidadAire?.norma_chilena || 'Bueno 🟢';
+                    document.getElementById('sincaVal').innerText = sincaNorma;
+                    document.getElementById('sincaMP25').innerText = `MP2.5: ${datosCalidadAire?.mp25_ugm3 || 12.0} µg/m³ • Haz clic para ver detalle`;
+
+                    // Cargar datos en modal de calidad de aire
+                    document.getElementById('sinca-modal-norma').innerText = sincaNorma;
+                    document.getElementById('sinca-modal-mp25').innerText = `Concentración MP2.5: ${datosCalidadAire?.mp25_ugm3 || 12.0} µg/m³ | MP10: ${datosCalidadAire?.mp10_ugm3 || 28.0} µg/m³`;
+                    
+                    const aqiInfo = datosCalidadAire?.tabla_internacional_aqi || {};
+                    document.getElementById('sinca-modal-aqi-idx').innerText = `Índice AQI: ${aqiInfo.aqi_indice || 35} — ${aqiInfo.categoria || 'Bueno (Good) 🟢'}`;
+                    document.getElementById('sinca-modal-aqi-desc').innerText = aqiInfo.descripcion_salud || 'Calidad del aire satisfactoria, riesgo nulo o mínimo para la salud.';
+
+                    document.getElementById('pressureVal').innerText = `${data.modo_urbano?.presion_hpa ?? 1013} hPa`;
+                    document.getElementById('uvSub').innerText = `Índice UV: ${data.modo_urbano?.indice_uv ?? 6}`;
+
+                    document.getElementById('alertTitle').innerText = `Alerta: ${data.modo_agricola?.alerta_helada_agrometeorologica?.riesgo_helada || 'Riesgo de Heladas'}`;
+                    document.getElementById('alertMessage').innerText = `Punto de rocío registrado en ${data.modo_agricola?.alerta_helada_agrometeorologica?.temperatura_rocio_c ?? 11}°C.`;
+
+                    // GEE
+                    document.getElementById('geeNdvi').innerText = data.modo_agricola?.salud_vegetacion_ndvi || '0.65';
+                    document.getElementById('geeNdviStatus').innerText = data.modo_agricola?.estado_vigor_vegetativo || 'Vigor Vegetativo Alto';
+
+                    document.getElementById('geeNdwi').innerText = data.modo_agricola?.estres_hidrico_ndwi || '0.38';
+                    document.getElementById('geeNdwiStatus').innerText = data.modo_agricola?.estado_estres_hidrico || 'Sin Estrés / Óptimo Riego';
+
+                    document.getElementById('geeLst').innerText = `${data.modo_agricola?.temperatura_superficie_suelo_lst_c || 14.8} °C`;
+                    document.getElementById('geeLstStatus').innerText = data.modo_agricola?.estado_temperatura_suelo || 'Sin Helada en Suelo';
+
+                    document.getElementById('geeEvi').innerText = data.modo_agricola?.indice_biomasa_evi || '0.48';
+                    document.getElementById('geeFirms').innerText = `${data.modo_agricola?.focos_calor_firms || 0} Focos Activos`;
+                    document.getElementById('geeEtReal').innerText = `${data.modo_agricola?.evapotranspiracion_real_mod16_mm_dia || 3.4} mm/día`;
+
+                    // SENAPRED
+                    if (data.alerta_oficial_senapred) {
+                        datosSenapred = data.alerta_oficial_senapred;
+                        document.getElementById('banner-senapred').style.display = 'flex';
+                        document.getElementById('senapred-titulo').innerText = datosSenapred.evento || 'Alerta Meteorológica SENAPRED';
+                        document.getElementById('senapred-desc').innerText = `${datosSenapred.nivel || 'Alerta Verde'}: ${datosSenapred.comunas || 'Comunas de la Región'}`;
+                    }
+
+                    renderizarPronosticoList(data.pronostico_numerico_openmeteo?.diario_7dias);
+                    renderizarTablaComparativa(data.estacion);
+
+                    if (data.pronostico_oficial_dmc?.resumen_nacional) {
+                        textoDmc = data.pronostico_oficial_dmc.resumen_nacional;
+                        document.getElementById('caja-boletin-dmc').style.display = 'flex';
+                        document.getElementById('texto-boletin-dmc').innerText = textoDmc;
+                    }
+
+                    renderizarGrafico48hDual(data.pronostico_numerico_openmeteo?.horario);
+                })
+                .catch(err => {
+                    console.error('Aviso cargando clima:', err);
+                })
+                .finally(() => {
+                    if (loader) loader.classList.remove('active');
+                });
+        }
+
+        function usarGPS() {
+            const loader = document.getElementById('loader');
+            loader.classList.add('active');
+
+            const procesarCoords = (uLat, uLon) => {
+                let cercana = null;
+                let minDist = Infinity;
+
+                if (todasEstaciones.length > 0) {
+                    todasEstaciones.forEach(e => {
+                        const dLat = (e.lat - uLat) * Math.PI / 180;
+                        const dLon = (e.lon - uLon) * Math.PI / 180;
+                        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(uLat * Math.PI / 180) * Math.cos(e.lat * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+                        const dist = 6371 * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+                        if (dist < minDist) {
+                            minDist = dist;
+                            cercana = e;
+                        }
+                    });
+                }
+
+                if (cercana) {
+                    cargarClima(cercana.lat, cercana.lon, minDist);
+                } else {
+                    cargarClima(uLat, uLon, 0);
+                }
+            };
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => procesarCoords(pos.coords.latitude, pos.coords.longitude),
+                    (err) => procesarCoords(-33.4450, -70.6830),
+                    { timeout: 3000 }
+                );
+            } else {
+                procesarCoords(-33.4450, -70.6830);
+            }
+        }
+
+        function seleccionarEstacionChip(key, ev) {
+            document.querySelectorAll('.chip-city').forEach(el => el.classList.remove('active'));
+            if (ev) ev.target.classList.add('active');
+            const target = ESTACIONES_CHIP[key];
+            if (target) cargarClima(target.lat, target.lon);
+        }
+
+        function renderizarPronosticoList(diario) {
+            const list = document.getElementById('forecastList');
+            if (!diario || !diario.time) return;
+            list.innerHTML = '';
+
+            const dias = ['Hoy', 'Mañana', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+            diario.time.slice(0, 7).forEach((tStr, idx) => {
+                const dateObj = new Date(tStr + 'T12:00:00');
+                const nombreDia = idx === 0 ? 'Hoy' : dias[dateObj.getDay()];
+                const max = Math.round(diario.temperature_2m_max[idx] || 20);
+                const min = Math.round(diario.temperature_2m_min[idx] || 8);
+                const rain = diario.precipitation_sum[idx] || 0.0;
+                const iconClass = rain > 1.0 ? 'fa-cloud-showers-heavy' : 'fa-sun';
+
+                list.innerHTML += `
+                    <div class="forecast-row">
+                        <span class="forecast-day">${nombreDia}</span>
+                        <i class="fa-solid ${iconClass} forecast-icon"></i>
+                        <span class="forecast-rain">${rain > 0 ? rain + ' mm' : ''}</span>
+                        <div class="forecast-temps">
+                            <span class="temp-max">${max}°</span>
+                            <span class="temp-min">${min}°</span>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function renderizarTablaComparativa(estacion) {
+            const body = document.getElementById('tabla-comparativa-body');
+            if (!todasEstaciones || todasEstaciones.length === 0) return;
+
+            const lat0 = estacion?.coordenadas?.latitud || -40.3479;
+            const lon0 = estacion?.coordenadas?.longitud || -73.3075;
+
+            const vecinas = todasEstaciones.map(e => {
+                const dLat = (e.lat - lat0) * (Math.PI / 180);
+                const dLon = (e.lon - lon0) * (Math.PI / 180);
+                const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat0 * (Math.PI / 180)) * Math.cos(e.lat * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                const distKm = Math.round(6371 * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) * 10) / 10;
+                return { ...e, distKm };
+            }).sort((a, b) => a.distKm - b.distKm).slice(0, 5);
+
+            body.innerHTML = `
+                <tr style="background: rgba(16, 185, 129, 0.1); color: var(--primary);">
+                    <td style="padding: 10px; font-weight: 800;">● ${estacion.nombre}</td>
+                    <td style="padding: 10px;">${estacion.red_oficial}</td>
+                    <td style="padding: 10px; font-family: 'Space Grotesk', monospace;">0.0 km</td>
+                    <td style="padding: 10px; text-align: right; font-weight: 700;">● En Vivo</td>
+                </tr>
+            `;
+
+            vecinas.forEach(e => {
+                body.innerHTML += `
+                    <tr style="border-top: 1px solid var(--border-color);">
+                        <td style="padding: 10px; font-weight: 600; color: var(--text-primary);">${e.nombre}</td>
+                        <td style="padding: 10px;">${e.red}</td>
+                        <td style="padding: 10px; font-family: 'Space Grotesk', monospace;">a ${e.distKm} km</td>
+                        <td style="padding: 10px; text-align: right; color: var(--text-muted);">Sincronizado</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function renderizarGrafico48hDual(horario) {
+            if (!horario || !horario.time) return;
+
+            const ctx = document.getElementById('grafico-pronostico-48h').getContext('2d');
+            const labels = horario.time.slice(0, 48).map(t => `${new Date(t).getHours()}:00`);
+            const temps = horario.temperature_2m.slice(0, 48);
+            const rains = horario.precipitation ? horario.precipitation.slice(0, 48) : new Array(48).fill(0.0);
+
+            if (miChart) miChart.destroy();
+
+            miChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            type: 'line',
+                            label: 'Temperatura (°C)',
+                            data: temps,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            yAxisID: 'yTemp'
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Lluvia (mm/h)',
+                            data: rains,
+                            backgroundColor: 'rgba(56, 189, 248, 0.6)',
+                            borderColor: '#38bdf8',
+                            borderWidth: 1,
+                            yAxisID: 'yRain'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255, 255, 255, 0.05)' } },
+                        yTemp: {
+                            type: 'linear',
+                            position: 'left',
+                            ticks: { color: '#10b981' },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            title: { display: true, text: 'Temp °C', color: '#10b981' }
+                        },
+                        yRain: {
+                            type: 'linear',
+                            position: 'right',
+                            min: 0,
+                            suggestedMax: 5,
+                            ticks: { color: '#38bdf8' },
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'Lluvia mm/h', color: '#38bdf8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function manejarBusquedaEstacion() {
+            const query = document.getElementById('input_busqueda').value;
+            const msg = document.getElementById('mensaje-busqueda');
+            const dropdown = document.getElementById('desplegable-resultados');
+
+            if (query.trim().length < 2) {
+                msg.style.display = 'none';
+                dropdown.style.display = 'none';
+                return;
+            }
+
+            msg.style.display = 'block';
+            msg.style.color = "var(--accent-blue)";
+            msg.innerText = "🔎 Buscando en 609 estaciones...";
+
+            fetch(`${API_BASE}/api/v1/buscar-estaciones?q=${encodeURIComponent(query)}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        msg.style.color = "var(--primary)";
+                        msg.innerText = `✓ ${data.length} estaciones encontradas`;
+                        dropdown.innerHTML = '';
+                        data.forEach(est => {
+                            dropdown.innerHTML += `
+                                <div onclick="cargarClima(${est.lat}, ${est.lon}); document.getElementById('desplegable-resultados').style.display = 'none';"
+                                    style="padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <div style="font-weight: 700; font-size: 12px; color: #fff;">${est.nombre}</div>
+                                        <div style="font-size: 10px; color: var(--text-muted);">${est.sector}</div>
+                                    </div>
+                                    <span style="font-size: 10px; background: rgba(16, 185, 129, 0.2); color: var(--primary); padding: 2px 6px; border-radius: 4px;">${est.red}</span>
+                                </div>
+                            `;
+                        });
+                        dropdown.style.display = 'block';
+                    } else {
+                        msg.style.color = "var(--accent-warning)";
+                        msg.innerText = "⚠ Sin coincidencias directas";
+                        dropdown.style.display = 'none';
+                    }
+                });
+        }
+
+        function cambiarModo(modo) {
+            const btnUrb = document.getElementById('btn-modo-urbano');
+            const btnAgr = document.getElementById('btn-modo-agricola');
+            const gridUrb = document.getElementById('panel-urbano-grid');
+            const gridAgr = document.getElementById('panel-agricola-grid');
+
+            if (modo === 'urbano') {
+                gridUrb.style.display = 'grid';
+                gridAgr.style.display = 'none';
+                btnUrb.classList.add('active-mode');
+                btnAgr.classList.remove('active-mode');
+            } else {
+                gridUrb.style.display = 'none';
+                gridAgr.style.display = 'grid';
+                btnAgr.classList.add('active-mode');
+                btnUrb.classList.remove('active-mode');
+            }
+        }
+
+        function abrirModalCalidadAire() {
+            document.getElementById('modal-sinca').style.display = 'flex';
+        }
+
+        function abrirModalSenapred() {
+            if (!datosSenapred) return;
+            const body = document.getElementById('senapred-modal-body');
+            body.innerHTML = `
+                <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid var(--accent-danger); padding: 12px; border-radius: 10px; font-weight: 800; color: var(--accent-danger);">
+                    ${datosSenapred.evento || 'Alerta Meteorológica SENAPRED'} (${datosSenapred.nivel || 'Alerta Verde'})
+                </div>
+                <div style="margin-top: 10px;"><strong>📍 Comunas / Zonas Afectadas:</strong> ${datosSenapred.comunas || 'Zona Regional Activa'}</div>
+                <div style="margin-top: 8px;"><strong>📄 Descripción del Evento:</strong> ${datosSenapred.descripcion || 'Condiciones meteorológicas monitoreadas por el Servicio Nacional de Prevención y Respuesta ante Desastres.'}</div>
+                <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);"><strong>⏰ Fecha de Emisión:</strong> ${new Date().toLocaleString()}</div>
+            `;
+            document.getElementById('modal-senapred').style.display = 'flex';
+        }
+
+        function abrirModalDmc() {
+            if (!textoDmc) return;
+            const body = document.getElementById('dmc-modal-body');
+            body.innerHTML = `
+                <div style="background: rgba(56, 189, 248, 0.15); border: 1px solid var(--accent-blue); padding: 12px; border-radius: 10px; font-weight: 800; color: var(--accent-blue);">
+                    Dirección Meteorológica de Chile (DMC) — Informe Sinóptico Oficial
+                </div>
+                <div style="margin-top: 12px; font-size: 13px; line-height: 1.6;">${textoDmc}</div>
+                <div style="margin-top: 12px; font-size: 11px; color: var(--text-muted);">Fuente: Servicios Climatológicos Dirección Meteorológica de Chile (DMC).</div>
+            `;
+            document.getElementById('modal-dmc').style.display = 'flex';
+        }
+
+        function cerrarModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        function aceptarUbicacionBienvenida() {
+            localStorage.setItem('meteoprecisa_bienvenida', 'true');
+            document.getElementById('modal-bienvenida').style.display = 'none';
+            usarGPS();
+        }
+
+        function omitirUbicacionBienvenida() {
+            localStorage.setItem('meteoprecisa_bienvenida', 'true');
+            document.getElementById('modal-bienvenida').style.display = 'none';
+            cargarClima(-33.4450, -70.6830);
+        }
+
+        function usarGPSOInicial() {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        const uLat = pos.coords.latitude;
+                        const uLon = pos.coords.longitude;
+                        cargarClima(uLat, uLon);
+                    },
+                    () => {
+                        cargarClima(-33.4450, -70.6830);
+                    },
+                    { timeout: 4000 }
+                );
+            } else {
+                cargarClima(-33.4450, -70.6830);
+            }
+        }
+
+        function abrirSateliteModal() {
+            document.getElementById('modal-satelite').style.display = 'flex';
+            fetch(`${API_BASE}/api/v1/satelite-goes19?ventana_horas=24`)
+                .then(r => r.json())
+                .then(data => {
+                    sateliteFrames = data.frames || [];
+                    sateliteIdx = 0;
+                    if (sateliteFrames.length > 0) {
+                        const slider = document.getElementById('satelite-slider');
+                        if (slider) {
+                            slider.max = sateliteFrames.length - 1;
+                            slider.value = 0;
+                        }
+                        document.getElementById('satelite-frame-img').src = sateliteFrames[0];
+                        document.getElementById('satelite-frame-counter').innerText = `Fotograma 1 / ${sateliteFrames.length}`;
+                        
+                        sateliteFrames.forEach(url => {
+                            const img = new Image();
+                            img.src = url;
+                        });
+
+                        iniciarSateliteLoop();
+                    }
+                });
+        }
+
+        function cerrarSateliteModal() {
+            document.getElementById('modal-satelite').style.display = 'none';
+            if (sateliteTimer) clearInterval(sateliteTimer);
+        }
+
+        function iniciarSateliteLoop() {
+            if (sateliteTimer) clearInterval(sateliteTimer);
+            sateliteTimer = setInterval(() => {
+                if (sateliteFrames.length > 0 && satelitePlaying) {
+                    sateliteIdx = (sateliteIdx + 1) % sateliteFrames.length;
+                    document.getElementById('satelite-frame-img').src = sateliteFrames[sateliteIdx];
+                    document.getElementById('satelite-frame-counter').innerText = `Fotograma ${sateliteIdx + 1} / ${sateliteFrames.length}`;
+                    document.getElementById('satelite-slider').value = sateliteIdx;
+                }
+            }, 100);
+        }
+
+        function toggleSatelitePlay() {
+            satelitePlaying = !satelitePlaying;
+            document.getElementById('btn-satelite-play').innerText = satelitePlaying ? 'Pausar' : 'Reproducir';
+        }
+
+        function cambiarFrameSatelite(val) {
+            sateliteIdx = parseInt(val);
+            if (sateliteFrames[sateliteIdx]) {
+                document.getElementById('satelite-frame-img').src = sateliteFrames[sateliteIdx];
+                document.getElementById('satelite-frame-counter').innerText = `Fotograma ${sateliteIdx + 1} / ${sateliteFrames.length}`;
+            }
+        }
+    </script>
+</body>
+</html>

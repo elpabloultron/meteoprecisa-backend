@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+httpx
+beautifulsoup4
+apscheduler
+pytest
+pytest-asyncio
+atmchile
+pandas
+earthengine-api
+google-auth
+python-dotenv
+

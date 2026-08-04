@@ -1,0 +1,43 @@
+{
+  "hosting": {
+    "site": "meteoprecisachile",
+    "public": "frontend/dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate, max-age=0"
+          },
+          {
+            "key": "Pragma",
+            "value": "no-cache"
+          },
+          {
+            "key": "Expires",
+            "value": "0"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "/api/**",
+        "run": {
+          "serviceId": "meteoprecisa-app",
+          "region": "southamerica-west1"
+        }
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

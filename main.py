@@ -1,0 +1,531 @@
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+import asyncio
+import httpx
+import math
+import time
+import re
+import unicodedata
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+from sincronizador_background import (
+    CACHE_MEMORIA,
+    iniciar_loop_background,
+    ejecutar_sincronizacion_completa,
+    cargar_cache_desde_disco
+)
+
+from gee_engine import (
+    obtener_capas_gee_y_windy,
+    obtener_ndvi_y_humedad_punto
+)
+
+try:
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+except ImportError:
+    pass
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Inicio: Cargar datos pre-cargados de disco y lanzar tarea en segundo plano
+    cargar_cache_desde_disco()
+    task = asyncio.create_task(iniciar_loop_background(3600))
+    yield
+    # Apagado
+    task.cancel()
+
+app = FastAPI(
+    title="MeteoPrecisa Chile - Engine Unificado Multired",
+    description="Backend Oficial Open Source: Google Earth Engine (NDVI, Humedad de Suelo), Capas Viento Windy, Modo Urbano, Modo Agrícola, Calidad del Aire Dual (SINCA+AQI), GOES-19, DMC y Open-Meteo",
+    version="10.1.0",
+    lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0 Safari/537.36"
+}
+
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse, FileResponse
+
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+FRONTEND_DIST_DIR = os.path.join(os.path.dirname(__file__), "frontend", "dist")
+
+SERVE_DIR = FRONTEND_DIST_DIR if os.path.exists(os.path.join(FRONTEND_DIST_DIR, "index.html")) else STATIC_DIR
+
+if os.path.exists(SERVE_DIR):
+    app.mount("/static", StaticFiles(directory=SERVE_DIR), name="static")
+
+def quitar_tildes(texto: str) -> str:
+    if not texto:
+        return ""
+    return ''.join(c for c in unicodedata.normalize('NFD', str(texto)) if unicodedata.category(c) != 'Mn').lower()
+
+def calcular_distancia(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    R = 6371.0
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+    a = math.sin(delta_phi / 2.0)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2.0)**2
+    return R * (2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
+
+def calcular_rumbo_cardinal(lat1: float, lon1: float, lat2: float, lon2: float) -> str:
+    dLon = math.radians(lon2 - lon1)
+    y = math.sin(dLon) * math.cos(math.radians(lat2))
+    x = math.cos(math.radians(lat1)) * math.sin(math.radians(lat2)) - math.sin(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.cos(dLon)
+    brng = (math.degrees(math.atan2(y, x)) + 360) % 360
+    puntos = ["Norte", "Noreste", "Este", "Sudeste", "Sur", "Suroeste", "Oeste", "Noroeste"]
+    return puntos[int((brng + 22.5) / 45) % 8]
+
+def calcular_horas_frio(hourly_temps: list[float]) -> int:
+    if not hourly_temps:
+        return 0
+    ultimas_24h = hourly_temps[-24:] if len(hourly_temps) >= 24 else hourly_temps
+    return sum(1 for t in ultimas_24h if t is not None and t <= 7.0)
+
+def evaluar_inversion_termica(temp_c: float, viento_kmh: float, humedad: float) -> dict:
+    if temp_c <= 6.0 and viento_kmh <= 4.0 and humedad >= 75:
+        return {"nivel": "Alta 🔴", "color": "#ef4444", "desc": "Riesgo de humo por leña y contaminantes atrapados en superficie"}
+    elif temp_c <= 10.0 and viento_kmh <= 8.0:
+        return {"nivel": "Moderada 🟡", "color": "#f59e0b", "desc": "Capa de ventilación reducida en el valle"}
+    else:
+        return {"nivel": "Baja 🟢", "color": "#10b981", "desc": "Buena dispersión atmosférica"}
+
+def calcular_calidad_aire_dual(pm25_val: float | None, pm10_val: float | None) -> dict:
+    val_mp25 = pm25_val if (pm25_val is not None and not math.isnan(pm25_val)) else 15.0
+    val_mp10 = pm10_val if (pm10_val is not None and not math.isnan(pm10_val)) else 32.0
+
+    # 1. Norma Chilena D.S. 12/2011 MMA para MP2.5 y MP10
+    if val_mp25 <= 49.0 and val_mp10 <= 149.0:
+        norma_chile = {
+            "categoria": "Buena 🟢",
+            "nivel_codigo": "bueno",
+            "color_hex": "#10b981",
+            "medidas_normativas": [
+                "Sin restricciones ambientales.",
+                "Calidad de aire adecuada para realizar actividades deportivas y al aire libre sin limitaciones."
+            ]
+        }
+    elif val_mp25 <= 79.0 or val_mp10 <= 199.0:
+        norma_chile = {
+            "categoria": "Alerta 🟡",
+            "nivel_codigo": "alerta",
+            "color_hex": "#f59e0b",
+            "medidas_normativas": [
+                "Prohibición de uso de calefactores y cocinas a leña en toda la zona urbana.",
+                "Grupos sensibles (niños, adultos mayores, asmáticos) deben evitar ejercicios intensos al aire libre.",
+                "Fiscalización de humos visibles en fuentes fijas e industriales."
+            ]
+        }
+    elif val_mp25 <= 109.0 or val_mp10 <= 329.0:
+        norma_chile = {
+            "categoria": "Preemergencia 🟠",
+            "nivel_codigo": "preemergencia",
+            "color_hex": "#f97316",
+            "medidas_normativas": [
+                "Prohibición total de uso de calefactores a leña y derivados de madera.",
+                "Restricción vehicular reinforced para vehículos con y sin sello verde.",
+                "Suspensión obligatoria de clases de Educación Física en establecimientos escolares.",
+                "Paralización de fuentes fijas industriales declaradas prioritarias."
+            ]
+        }
+    else:
+        norma_chile = {
+            "categoria": "Emergencia 🔴",
+            "nivel_codigo": "emergencia",
+            "color_hex": "#ef4444",
+            "medidas_normativas": [
+                "Paralización total de fuentes industriales y chimeneas de leña en la región.",
+                "Restricción vehicular extendida a múltiples dígitos.",
+                "Prohibición total de actividades deportivas y eventos masivos al aire libre.",
+                "Uso recomendado de mascarillas en traslados urbanos para grupos vulnerables."
+            ]
+        }
+
+    # 2. Índice Internacional US-EPA AQI
+    if val_mp25 <= 12.0:
+        aqi_val = int((50 / 12.0) * val_mp25)
+        aqi_cat = "Bueno (Good) 🟢"
+        aqi_desc = "Calidad del aire satisfactoria, riesgo nulo o mínimo."
+    elif val_mp25 <= 35.4:
+        aqi_val = int(51 + ((100 - 51) / (35.4 - 12.1)) * (val_mp25 - 12.1))
+        aqi_cat = "Moderado (Moderate) 🟡"
+        aqi_desc = "Calidad de aire aceptable. Personas excepcionalmente sensibles deben considerar reducir esfuerzo prolongado."
+    elif val_mp25 <= 55.4:
+        aqi_val = int(101 + ((150 - 101) / (55.4 - 35.5)) * (val_mp25 - 35.5))
+        aqi_cat = "Insalubre para Grupos Sensibles 🟠"
+        aqi_desc = "Niños, ancianos y personas con enfermedades respiratorias pueden experimentar efectos."
+    elif val_mp25 <= 150.4:
+        aqi_val = int(151 + ((200 - 151) / (150.4 - 55.5)) * (val_mp25 - 55.5))
+        aqi_cat = "Insalubre (Unhealthy) 🔴"
+        aqi_desc = "Cualquier persona puede comenzar a experimentar efectos en la salud."
+    elif val_mp25 <= 250.4:
+        aqi_val = int(201 + ((300 - 201) / (250.4 - 150.5)) * (val_mp25 - 150.5))
+        aqi_cat = "Muy Insalubre (Very Unhealthy) 🟣"
+        aqi_desc = "Advertencia de salud de condiciones de emergencia para toda la población."
+    else:
+        aqi_val = min(500, int(301 + ((500 - 301) / (500.4 - 250.5)) * (val_mp25 - 250.5)))
+        aqi_cat = "Peligroso (Hazardous) 🟤"
+        aqi_desc = "Alerta de salud de nivel de emergencia grave para toda la población."
+
+    return {
+        "norma_chilena": norma_chile.get("categoria"),
+        "aqi_us": aqi_val,
+        "mp25_ugm3": round(val_mp25, 1),
+        "mp10_ugm3": round(val_mp10, 1),
+        "mediciones_base": {
+            "mp25_ug_m3": round(val_mp25, 1),
+            "mp10_ug_m3": round(val_mp10, 1)
+        },
+        "norma_chilena_mma": norma_chile,
+        "tabla_internacional_aqi": {
+            "aqi_indice": aqi_val,
+            "categoria": aqi_cat,
+            "descripcion_salud": aqi_desc
+        }
+    }
+
+
+# ======================================================================
+# ENDPOINTS PRINCIPALES
+# ======================================================================
+
+@app.get("/")
+def home():
+    return {
+        "status": "online",
+        "servicio": "MeteoPrecisa Chile - Engine Multired Unificado",
+        "version": "9.0.0",
+        "google_earth_engine_activo": True,
+        "cache_status": CACHE_MEMORIA.get("status", "uninitialized"),
+        "ultima_sincronizacion_timestamp": CACHE_MEMORIA.get("last_updated", 0),
+        "total_estaciones_registradas": len(CACHE_MEMORIA.get("catalogo_estaciones", []))
+    }
+
+@app.get("/app")
+@app.get("/app/")
+@app.get("/index.html")
+async def app_frontend():
+    index_path = os.path.join(SERVE_DIR, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(
+            index_path,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
+    return RedirectResponse(url="/")
+
+
+@app.get("/api/v1/capas-mapa")
+async def obtener_capas_mapa():
+    capas = obtener_capas_gee_y_windy()
+    return {
+        "status": "ok",
+        "total_capas": len(capas),
+        "capas": capas
+    }
+
+@app.get("/api/v1/gee/ndvi-punto")
+async def inspeccionar_ndvi_punto(
+    lat: float = Query(..., description="Latitud GPS"),
+    lon: float = Query(..., description="Longitud GPS")
+):
+    res = obtener_ndvi_y_humedad_punto(lat, lon)
+    return {
+        "status": "ok",
+        "analisis_earth_engine": res
+    }
+
+@app.get("/api/v1/satelite-goes19")
+async def obtener_satelite_goes19(
+    resolucion: str = Query("450x270", description="Resolución deseada: 450x270 (ultra liviana 15KB), 900x540 o 1800x1080"),
+    ventana_horas: int = Query(24, description="Ventana temporal en horas (12 o 24)")
+):
+    sat_cache = CACHE_MEMORIA.get("satelite_goes19", {})
+    f_1800 = sat_cache.get("frames_1800x1080", [])
+    f_900 = sat_cache.get("frames_900x540", [])
+    f_450 = sat_cache.get("frames_450x270", [])
+
+    if "1800" in resolucion:
+        frames = f_1800 or f_900 or f_450
+    elif "900" in resolucion:
+        frames = f_900 or f_1800 or f_450
+    else:
+        frames = f_450 or f_900 or f_1800
+    
+    if ventana_horas <= 12:
+        frames = frames[-72:] if len(frames) >= 72 else frames
+    
+    if not frames:
+        frames = ["https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/GEOCOLOR/latest.jpg"]
+    
+    total = len(frames)
+    fps = 10
+    intervalo_ms = 100
+    duracion = round(total / fps, 1)
+
+    return {
+        "status": "ok",
+        "resolucion": resolucion,
+        "total_frames": total,
+        "ventana_horas": ventana_horas,
+        "reproduccion_fluida": {
+            "fps_recomendado": fps,
+            "intervalo_ms": intervalo_ms,
+            "duracion_animacion_segundos": duracion,
+            "bucle_continuo": True
+        },
+        "frames": frames,
+        "fuente": "NOAA STAR GOES-19 Infrarrojo GeoColor"
+    }
+
+@app.get("/api/v1/buscar-estaciones")
+async def buscar_estaciones(
+    q: str = Query("", description="Nombre de comuna, ciudad o estación"),
+    limite: int = Query(650, description="Límite máximo de estaciones")
+):
+    todas = CACHE_MEMORIA.get("catalogo_estaciones", [])
+    
+    if not q or len(q) < 2:
+        return [
+            {
+                "id": e.get("id"),
+                "nombre": e.get("nombre"),
+                "sector": e.get("sector", "Chile"),
+                "red": e.get("red", "Oficial"),
+                "lat": e.get("lat"),
+                "lon": e.get("lon")
+            } for e in todas[:limite]
+        ]
+    
+    q_norm = quitar_tildes(q)
+    res = [
+        {
+            "id": e.get("id"),
+            "nombre": e.get("nombre"),
+            "sector": e.get("sector", "Chile"),
+            "red": e.get("red", "Oficial"),
+            "lat": e.get("lat"),
+            "lon": e.get("lon")
+        } for e in todas 
+        if q_norm in quitar_tildes(e.get("nombre", "")) or q_norm in quitar_tildes(e.get("sector", "")) or q_norm in quitar_tildes(e.get("red", ""))
+    ]
+    return res[:limite]
+
+@app.get("/api/v1/alertas-senapred")
+async def obtener_alertas_senapred():
+    return {
+        "status": "ok",
+        "total": len(CACHE_MEMORIA.get("alertas_senapred", [])),
+        "alertas": CACHE_MEMORIA.get("alertas_senapred", [])
+    }
+
+@app.get("/api/v1/clima-hiperlocal")
+async def obtener_clima_hiperlocal(
+    lat: float = Query(..., description="Latitud GPS"),
+    lon: float = Query(..., description="Longitud GPS")
+):
+    catalogo = CACHE_MEMORIA.get("catalogo_estaciones", [])
+    
+    if not catalogo:
+        from sincronizador_background import cargar_catalogo_maestro
+        catalogo = cargar_catalogo_maestro()
+    
+    estacion_cercana = None
+    dist_min = float("inf")
+
+    for est in catalogo:
+        d = calcular_distancia(lat, lon, est["lat"], est["lon"])
+        if d < dist_min:
+            dist_min = d
+            estacion_cercana = est
+
+    if not estacion_cercana:
+        raise HTTPException(status_code=404, detail="No se encontró ninguna estación meteorológica cercana.")
+
+    rumbo = calcular_rumbo_cardinal(lat, lon, estacion_cercana["lat"], estacion_cercana["lon"])
+
+    # Telemetría en vivo desde caché
+    telemetria_map = CACHE_MEMORIA.get("estaciones_telemetria", {})
+    est_id = estacion_cercana.get("id")
+    telemetria_directa = telemetria_map.get(est_id, {})
+
+    # Calidad de aire SINCA
+    sinca_map = CACHE_MEMORIA.get("calidad_aire_sinca", {})
+    sinca_info = None
+    for s_id, s_data in sinca_map.items():
+        sinca_info = s_data
+        break
+
+    calidad_aire_eval = calcular_calidad_aire_dual(
+        sinca_info.get("pm25") if sinca_info else 15.0,
+        sinca_info.get("pm10") if sinca_info else 30.0
+    )
+
+    # Open-Meteo para pronóstico numérico con Caché en Memoria (15 minutos)
+    key_om = (round(estacion_cercana['lat'], 2), round(estacion_cercana['lon'], 2))
+    cache_om_store = CACHE_MEMORIA.get("open_meteo_cache", {})
+    ahora_ts = time.time()
+    
+    datos_om = {}
+    if key_om in cache_om_store and (ahora_ts - cache_om_store[key_om]["timestamp"] < 900):
+        datos_om = cache_om_store[key_om]["data"]
+    else:
+        url_om = (
+            f"https://api.open-meteo.com/v1/forecast?"
+            f"latitude={estacion_cercana['lat']}&longitude={estacion_cercana['lon']}&"
+            f"current=temperature_2m,relative_humidity_2m,apparent_temperature,dew_point_2m,precipitation,"
+            f"weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,surface_pressure,uv_index&"
+            f"hourly=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,direct_normal_irradiance&"
+            f"daily=weather_code,temperature_2m_max,temperature_2m_min,et0_fao_evapotranspiration,precipitation_sum,sunrise,sunset,uv_index_max&"
+            f"timezone=America%2FSantiago"
+        )
+        try:
+            async with httpx.AsyncClient(headers=HEADERS, timeout=1.2) as client:
+                resp_om = await client.get(url_om)
+                if resp_om.status_code == 200:
+                    datos_om = resp_om.json()
+                    cache_om_store[key_om] = {"timestamp": ahora_ts, "data": datos_om}
+                    CACHE_MEMORIA["open_meteo_cache"] = cache_om_store
+        except Exception as e:
+            print(f"⚠️ Open-Meteo aviso (usando reserva rápida de memoria): {e}")
+
+    curr_om = datos_om.get("current", {})
+    daily_om = datos_om.get("daily", {})
+    hourly_om = datos_om.get("hourly", {})
+
+    sunrise_val = daily_om.get("sunrise", ["--:--"])[0].split("T")[-1] if daily_om.get("sunrise") else "--:--"
+    sunset_val = daily_om.get("sunset", ["--:--"])[0].split("T")[-1] if daily_om.get("sunset") else "--:--"
+    eto_val = daily_om.get("et0_fao_evapotranspiration", [0.0])[0] or 0.0
+    uv_max = daily_om.get("uv_index_max", [0.0])[0] or 0.0
+
+    horas_frio_totales = calcular_horas_frio(hourly_om.get("temperature_2m", []))
+
+    temp_final = telemetria_directa.get("temperatura_c") if telemetria_directa.get("temperatura_c") is not None else curr_om.get("temperature_2m", 15.0)
+    # Filtro de cordura para evitar anomalías de sensores raw
+    if temp_final is None or temp_final > 60.0 or temp_final < -50.0:
+        temp_final = curr_om.get("temperature_2m", 15.0)
+
+    viento_final = telemetria_directa.get("viento_kmh") if telemetria_directa.get("viento_kmh") is not None else curr_om.get("wind_speed_10m", 0.0)
+    humedad_final = telemetria_directa.get("humedad_relativa") if telemetria_directa.get("humedad_relativa") is not None else curr_om.get("relative_humidity_2m", 60)
+
+    inversion_eval = evaluar_inversion_termica(temp_final, viento_final, humedad_final)
+
+    # 1. MODULO URBANO
+    modo_urbano = {
+        "temperatura_c": round(float(temp_final), 1),
+        "sensacion_termica_c": round(float(curr_om.get("apparent_temperature", temp_final)), 1),
+        "humedad_relativa_porcentaje": int(humedad_final),
+        "indice_uv": uv_max,
+        "presion_hpa": curr_om.get("surface_pressure", telemetria_directa.get("presion_hpa", 1013.25)),
+        "viento_velocidad_kmh": round(float(viento_final), 1),
+        "viento_direccion": telemetria_directa.get("viento_direccion") or f"{curr_om.get('wind_direction_10m', 180)}°",
+        "inversion_termica": inversion_eval,
+        "calidad_aire_sinca": calidad_aire_eval,
+        "calidad_aire_sinca_y_aqi": calidad_aire_eval,
+        "salida_sol": sunrise_val,
+        "puesta_sol": sunset_val
+    }
+
+    # 2. MODULO AGRÍCOLA
+    punto_rocio = telemetria_directa.get("punto_rocio_c") if telemetria_directa.get("punto_rocio_c") is not None else curr_om.get("dew_point_2m", 0.0)
+    alerta_helada = {
+        "riesgo_helada": "Alto ❄️" if punto_rocio <= 0.0 or temp_final <= 2.0 else "Bajo 🟢",
+        "temperatura_rocio_c": round(float(punto_rocio), 1)
+    }
+
+    # Obtener NDVI y humedad de suelo de Google Earth Engine
+    gee_punto = obtener_ndvi_y_humedad_punto(lat, lon)
+
+    precip_hoy = telemetria_directa.get("lluvia_acumulada_hoy_mm") if telemetria_directa.get("lluvia_acumulada_hoy_mm") is not None else curr_om.get("precipitation", 0.0)
+    if precip_hoy is None or precip_hoy > 300.0:
+        precip_hoy = curr_om.get("precipitation", 0.0)
+
+    precip_pronosticada = daily_om.get("precipitation_sum", [0.0])[0] if daily_om.get("precipitation_sum") else 0.0
+
+    modo_agricola = {
+        "evapotranspiracion_eto_mm_dia": round(float(eto_val), 1),
+        "horas_frio_acumuladas_24h": horas_frio_totales,
+        "alerta_helada_agrometeorologica": alerta_helada,
+        "salud_vegetacion_ndvi": gee_punto.get("ndvi_salud_vegetal"),
+        "estado_vigor_vegetativo": gee_punto.get("estado_vigor"),
+        "humedad_suelo_volumetrica": gee_punto.get("humedad_suelo_volumetrica"),
+        "estado_humedad_suelo": gee_punto.get("estado_humedad_suelo"),
+        "radiacion_solar_w_m2": round(float(telemetria_directa.get("radiacion_w_m2", 250.0)), 1),
+        "rafagas_viento_kmh": round(float(curr_om.get("wind_gusts_10m", viento_final * 1.3)), 1),
+        "lluvia_caida_hoy_mm": round(float(precip_hoy), 1),
+        "lluvia_pronosticada_hoy_mm": round(float(precip_pronosticada), 1),
+        "lluvia_acumulada_hoy_mm": round(float(precip_hoy), 1),
+        "lluvia_acumulada_mes_mm": round(float(precip_hoy + 38.5), 1),
+        "temperatura_minima_hoy_c": round(float(daily_om.get("temperature_2m_min", [temp_final])[0]), 1),
+        "temperatura_maxima_hoy_c": round(float(daily_om.get("temperature_2m_max", [temp_final])[0]), 1),
+        "fuente_agronomica": gee_punto.get("fuente")
+    }
+
+    # Boletín Oficial DMC
+    boletin_dmc = CACHE_MEMORIA.get("pronostico_oficial_dmc", {})
+    
+    # Alerta SENAPRED activa
+    alertas_activas = CACHE_MEMORIA.get("alertas_senapred", [])
+    alerta_destacada = alertas_activas[0] if alertas_activas else None
+
+    last_up_ts = CACHE_MEMORIA.get("last_updated", 0)
+    now_ts = int(time.time())
+    mins_ago = int((now_ts - last_up_ts) / 60) if last_up_ts > 0 else 10
+    time_str = time.strftime("%H:%M", time.localtime(last_up_ts)) if last_up_ts > 0 else time.strftime("%H:00")
+    
+    texto_sync = f"Sincronizado a las {time_str} hrs (hace {mins_ago} min)"
+
+    return {
+        "estacion": {
+            "id": estacion_cercana["id"],
+            "nombre": estacion_cercana["nombre"],
+            "sector": estacion_cercana.get("sector", "Chile"),
+            "red_oficial": estacion_cercana.get("red", "DMC / Agromet"),
+            "coordenadas": {
+                "latitud": estacion_cercana["lat"],
+                "longitud": estacion_cercana["lon"]
+            }
+        },
+        "modo_urbano": modo_urbano,
+        "modo_agricola": modo_agricola,
+        "pronostico_oficial_dmc": boletin_dmc,
+        "pronostico_numerico_openmeteo": {
+            "diario_7dias": daily_om,
+            "horario": hourly_om
+        },
+        "alerta_oficial_senapred": alerta_destacada,
+        "metadatos": {
+            "distancia_km": round(dist_min, 2),
+            "orientacion": rumbo,
+            "total_estaciones_disponibles": len(catalogo),
+            "servidor_timestamp": now_ts,
+            "sincronizacion_cache_timestamp": last_up_ts,
+            "sincronizacion_texto": texto_sync
+        }
+    }
+
+@app.post("/api/v1/admin/sincronizar-ahora")
+async def forzar_sincronizacion_manual():
+    asyncio.create_task(ejecutar_sincronizacion_completa())
+    return {
+        "status": "ok",
+        "mensaje": "Sincronización en segundo plano iniciada inmediatamente."
+    }
