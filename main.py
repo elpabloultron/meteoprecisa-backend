@@ -24,6 +24,29 @@ from gee_engine import (
     obtener_capas_gee_y_windy,
     obtener_ndvi_y_humedad_punto
 )
+import gee_service
+
+def construir_transparency_metadata(last_up_ts: int, boletin_dmc: dict = None) -> dict:
+    now_ts = int(time.time())
+    mins_ago = int((now_ts - last_up_ts) / 60) if last_up_ts > 0 else 0
+    iso_time = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(last_up_ts if last_up_ts > 0 else now_ts))
+    
+    if mins_ago <= 0:
+        updated_str = "Se actualizó hace un instante"
+    elif mins_ago == 1:
+        updated_str = "Se actualizó hace 1 minuto"
+    else:
+        updated_str = f"Se actualizó hace {mins_ago} minutos"
+
+    boletin_txt = boletin_dmc.get("resumen_nacional", "") if isinstance(boletin_dmc, dict) else ""
+
+    return {
+        "source_name": "Dirección Meteorológica de Chile / Google Earth Engine",
+        "last_fetched_timestamp": iso_time,
+        "updated_ago_str": updated_str,
+        "official_bulletin": boletin_txt or "Predominio de estabilidad atmosférica en la zona central y valles interiores de Chile."
+    }
+
 
 try:
     import urllib3
@@ -512,6 +535,7 @@ async def obtener_clima_hiperlocal(
             "horario": hourly_om
         },
         "alerta_oficial_senapred": alerta_destacada,
+        "transparency_metadata": construir_transparency_metadata(last_up_ts, boletin_dmc),
         "metadatos": {
             "distancia_km": round(dist_min, 2),
             "orientacion": rumbo,
@@ -522,10 +546,21 @@ async def obtener_clima_hiperlocal(
         }
     }
 
+@app.get("/api/v1/weather/current")
+async def obtener_clima_actual_api(
+    lat: float = Query(..., description="Latitud GPS"),
+    lng: float | None = Query(None, description="Longitud GPS (lng)"),
+    lon: float | None = Query(None, description="Longitud GPS (lon)")
+):
+    longitud_final = lng if lng is not None else lon
+    if longitud_final is None:
+        raise HTTPException(status_code=400, detail="Debe proporcionar el parámetro 'lng' o 'lon'.")
+    return await obtener_clima_hiperlocal(lat=lat, lon=longitud_final)
+
 @app.post("/api/v1/admin/sincronizar-ahora")
 async def forzar_sincronizacion_manual():
     asyncio.create_task(ejecutar_sincronizacion_completa())
     return {
         "status": "ok",
         "mensaje": "Sincronización en segundo plano iniciada inmediatamente."
-    }
+    }

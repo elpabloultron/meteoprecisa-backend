@@ -101,3 +101,16 @@ def test_guardar_cache_atomico():
     import os
     assert os.path.exists("cache_servidor.json")
 
+def test_weather_current_endpoint():
+    response = client.get("/api/v1/weather/current?lat=-33.4450&lng=-70.6830")
+    assert response.status_code == 200
+    data = response.json()
+    assert "estacion" in data
+    assert "transparency_metadata" in data
+    meta = data["transparency_metadata"]
+    assert "source_name" in meta
+    assert "last_fetched_timestamp" in meta
+    assert "updated_ago_str" in meta
+    assert "official_bulletin" in meta
+
+
