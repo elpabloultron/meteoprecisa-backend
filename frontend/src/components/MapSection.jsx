@@ -55,10 +55,10 @@ export default function MapSection({ estacionSeleccionada, onOpenSateliteModal }
       </div>
 
       {/* EMBED OFICIAL DE WINDY */}
-      <div className="h-[520px] w-full rounded-xl overflow-hidden border border-slate-800 relative z-0">
+      <div className="h-[520px] w-full rounded-xl overflow-hidden border border-slate-800 relative z-10 touch-pan-x touch-pan-y touch-pinch-zoom">
         <iframe
           title="Windy Map"
-          className="w-full h-full border-0 rounded-xl"
+          className="w-full h-full border-0 rounded-xl pointer-events-auto"
           src={windyUrl}
         />
       </div>

@@ -539,6 +539,9 @@ async def obtener_clima_hiperlocal(
     raw_url = "https://climatologia.meteochile.gob.cl" if "dmc" in str(st_id).lower() else ("https://agrometeorologia.cl" if "agromet" in str(st_id).lower() else "https://redmeteo.cl")
 
     return {
+        "station_id": st_id,
+        "raw_source_url": raw_url,
+        "is_live_data": True,
         "estacion": {
             "id": st_id,
             "station_id": st_id,

@@ -12,6 +12,7 @@ import SatelliteModal from './components/SatelliteModal';
 import BottomNav from './components/BottomNav';
 import DetailDrawer from './components/DetailDrawer';
 import EstacionesCercanasModal from './components/EstacionesCercanasModal';
+import LocationFallbackModal from './components/LocationFallbackModal';
 
 const API_BASE = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ? 'http://localhost:8000'
@@ -24,6 +25,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [sateliteModalOpen, setSateliteModalOpen] = useState(false);
   const [cercanasModalOpen, setCercanasModalOpen] = useState(false);
+  const [gpsFallbackOpen, setGpsFallbackOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('inicio');
 
   // Estado para el DetailDrawer de métricas y auditoría
@@ -40,9 +42,14 @@ export default function App() {
         (pos) => {
           setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude });
         },
-        (err) => console.log("Geolocalización predeterminada (Santiago):", err),
+        (err) => {
+          console.log("Geolocalización predeterminada (Santiago):", err);
+          setGpsFallbackOpen(true);
+        },
         { timeout: 8000, enableHighAccuracy: true }
       );
+    } else {
+      setGpsFallbackOpen(true);
     }
   }, []);
 
@@ -193,6 +200,13 @@ export default function App() {
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         detailData={selectedMetric}
+      />
+
+      {/* FALLBACK DE UBICACIÓN */}
+      <LocationFallbackModal
+        isOpen={gpsFallbackOpen}
+        onClose={() => setGpsFallbackOpen(false)}
+        onSelect={(lat, lon) => setCoords({ lat, lon })}
       />
 
       {/* NAVEGACIÓN INFERIOR TÁCTIL (BOTTOM NAV BAR MÓVIL) */}
