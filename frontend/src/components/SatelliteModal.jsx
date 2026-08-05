@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { X, Satellite, Clock, ShieldCheck, RefreshCw } from 'lucide-react';
+import { formatLocalTime } from '../utils/timeUtils';
 
-export default function SatelliteModal({ isOpen, onClose, apiBase }) {
+export default function SatelliteModal({ isOpen, onClose, apiBase, goesData }) {
   const [loopData, setLoopData] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const isoTimestamp = loopData?.last_updated_ts ? new Date(loopData.last_updated_ts * 1000).toISOString() : null;
+  const { localTimeLabel, relativeTimeLabel } = formatLocalTime(isoTimestamp);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -42,11 +46,11 @@ export default function SatelliteModal({ isOpen, onClose, apiBase }) {
                   Reproductor Bucle Satelital NOAA GOES-19
                 </h3>
                 <span className="px-2.5 py-0.5 text-[10px] font-bold bg-purple-500/20 text-purple-300 rounded-full border border-purple-500/30">
-                  {loopData?.updated_at_label || 'Actualización a las 18:00 hrs'}
+                  {localTimeLabel || 'Actualizando...'}
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Secuencia GeoColor procesada en backend a 10 fps (Bucle liviano de la última hora)
+                Secuencia GeoColor procesada en backend a 20 fps (Bucle liviano de las últimas 24 horas)
               </p>
             </div>
           </div>
@@ -79,7 +83,8 @@ export default function SatelliteModal({ isOpen, onClose, apiBase }) {
           {/* BADGE DE TIEMPO Y FUENTE EN VIVO */}
           <div className="absolute top-4 right-4 bg-slate-950/85 px-3 py-1.5 rounded-xl border border-purple-500/30 text-xs font-mono text-purple-300 backdrop-blur-md flex items-center gap-2">
             <Clock className="w-3.5 h-3.5 text-purple-400" />
-            <span>{loopData?.updated_at_label || "Actualización a las 18:00 hrs"}</span>
+            <span className="font-semibold text-white">{localTimeLabel}</span>
+            <span className="text-white/60 ml-2">({relativeTimeLabel})</span>
           </div>
         </div>
 

@@ -1,5 +1,6 @@
 import React from 'react';
-import { MapPin, ShieldAlert, Radio, ShieldCheck, Share2, Layers } from 'lucide-react';
+import { MapPin, ShieldAlert, Radio, ShieldCheck, Share2, Clock } from 'lucide-react';
+import { formatLocalTime } from '../utils/timeUtils';
 
 export default function WeatherHeader({ climaData, onOpenEstacionesCercanas }) {
   if (!climaData) return null;
@@ -11,7 +12,8 @@ export default function WeatherHeader({ climaData, onOpenEstacionesCercanas }) {
   const tMin = modo_agricola?.temperatura_minima_hoy_c ?? 10;
   const tMax = modo_agricola?.temperatura_maxima_hoy_c ?? 22;
 
-  const updatedLabel = transparency_metadata?.updated_at_label || transparency_metadata?.updated_ago_str || "Actualización a las 18:00 hrs";
+  const isoTimestamp = transparency_metadata?.last_fetched_timestamp;
+  const { localTimeLabel, relativeTimeLabel } = formatLocalTime(isoTimestamp);
 
   const compartir = () => {
     const url = window.location.href;
@@ -98,7 +100,11 @@ export default function WeatherHeader({ climaData, onOpenEstacionesCercanas }) {
 
           <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/15 text-emerald-300 font-semibold rounded-full border border-emerald-500/30">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            {updatedLabel}
+            {localTimeLabel}
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800/80 text-slate-300 font-semibold rounded-full border border-slate-700">
+            <Clock className="w-3.5 h-3.5 text-slate-400" />
+            {relativeTimeLabel}
           </span>
         </div>
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Sun, CloudSun, CloudRain, Snowflake, Calendar } from 'lucide-react';
 
-export default function DailyForecastCards({ dailyForecast, onSelectMetric }) {
+export default function DailyForecastCards({ dailyForecast, hourlyForecast, onSelectMetric, onOpenHourly }) {
   if (!dailyForecast || !dailyForecast.time || dailyForecast.time.length === 0) {
     return (
       <div className="glass-panel p-6 text-center text-slate-400 text-xs">
@@ -75,7 +75,38 @@ export default function DailyForecastCards({ dailyForecast, onSelectMetric }) {
           const rightPct = Math.max(0, Math.min(100, ((globalMax - tMax) / tempRange) * 100));
 
           const handleClick = () => {
-            if (onSelectMetric) {
+            if (onOpenHourly && hourlyForecast && hourlyForecast.time) {
+              const targetPrefix = fechaStr; // e.g. "2026-08-04"
+              const dayHourlyData = {
+                dayName: nombreDia === 'Hoy' ? 'Hoy' : diasSemana[dateObj.getDay()],
+                hourly: []
+              };
+
+              for (let i = 0; i < hourlyForecast.time.length; i++) {
+                if (hourlyForecast.time[i].startsWith(targetPrefix)) {
+                  const dt = new Date(hourlyForecast.time[i]);
+                  const tHour = dt.getHours().toString().padStart(2, '0') + ':00';
+                  
+                  // Simplified icon logic for drawer
+                  let HIcon = '🌤️';
+                  const hRain = hourlyForecast.precipitation?.[i] || 0;
+                  const hTemp = hourlyForecast.temperature_2m?.[i] || 0;
+                  if (hRain > 1) HIcon = '🌧️';
+                  else if (hRain > 0) HIcon = '🌦️';
+                  else if (hTemp <= 2) HIcon = '❄️';
+                  else if (hourlyForecast.weather_code?.[i] === 0) HIcon = '☀️';
+
+                  dayHourlyData.hourly.push({
+                    timeLabel: tHour,
+                    temp: Math.round(hTemp),
+                    precip: hRain,
+                    wind: Math.round(hourlyForecast.wind_speed_10m?.[i] || 0),
+                    icon: HIcon
+                  });
+                }
+              }
+              onOpenHourly(dayHourlyData);
+            } else if (onSelectMetric) {
               onSelectMetric({
                 title: `Pronóstico ${nombreDia} (${dateObj.getDate()}/${dateObj.getMonth() + 1})`,
                 valor: `${tMax}°C / ${tMin}°C`,

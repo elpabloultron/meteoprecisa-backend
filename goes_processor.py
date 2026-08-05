@@ -23,13 +23,13 @@ GOES_CACHE_METADATA = {
     "updated_at_label": "Pendiente de actualización",
     "video_url": "/static/goes19_loop.webp",
     "total_frames": 0,
-    "fps": 10,
+    "fps": 20,
     "raw_source_url": "https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/GEOCOLOR/",
     "is_live_data": True
 }
 
 
-async def procesar_video_goes19(max_frames: int = 24) -> dict:
+async def procesar_video_goes19(max_frames: int = 144) -> dict:
     """
     Descarga los últimos fotogramas de la NOAA para Chile (GOES-19 SSA),
     los compila en un archivo WebP animado ultra liviano y lo guarda en static/goes19_loop.webp.
@@ -64,8 +64,8 @@ async def procesar_video_goes19(max_frames: int = 24) -> dict:
                             img_resp = await client.get(frame_url)
                             if img_resp.status_code == 200:
                                 img = Image.open(io.BytesIO(img_resp.content))
-                                # Redimensionar para garantizar reproducción fluida (< 2MB WebP)
-                                img.thumbnail((720, 432))
+                                # Redimensionar para garantizar reproducción fluida (< 3MB WebP para 144 frames)
+                                img.thumbnail((480, 288))
                                 images.append(img)
                         except Exception as e_img:
                             logger.warning(f"Error descargando fotograma {frame_url}: {e_img}")
@@ -77,7 +77,7 @@ async def procesar_video_goes19(max_frames: int = 24) -> dict:
                             format="WEBP",
                             save_all=True,
                             append_images=images[1:],
-                            duration=100,  # 10 fps
+                            duration=50,  # 20 fps para animación suave (aprox 7s para 24h)
                             loop=0,
                             quality=80
                         )
@@ -90,7 +90,7 @@ async def procesar_video_goes19(max_frames: int = 24) -> dict:
                             "updated_at_label": f"Actualizada a las {time_label} hrs",
                             "video_url": "/static/goes19_loop.webp",
                             "total_frames": len(images),
-                            "fps": 10,
+                            "fps": 20,
                             "raw_source_url": url_base,
                             "is_live_data": True
                         }
@@ -126,8 +126,8 @@ def obtener_satellite_latest_loop() -> dict:
             "last_updated_ts": now_ts,
             "updated_at_label": f"Actualizada a las {time_label} hrs",
             "video_url": "/static/goes19_loop.webp",
-            "total_frames": 24,
-            "fps": 10,
+            "total_frames": 144,
+            "fps": 20,
             "raw_source_url": "https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/GEOCOLOR/",
             "is_live_data": True
         }

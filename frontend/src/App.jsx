@@ -11,6 +11,8 @@ import ComparisonTable from './components/ComparisonTable';
 import SatelliteModal from './components/SatelliteModal';
 import BottomNav from './components/BottomNav';
 import DetailDrawer from './components/DetailDrawer';
+import AqiDrawer from './components/AqiDrawer';
+import HourlyForecastDrawer from './components/HourlyForecastDrawer';
 import EstacionesCercanasModal from './components/EstacionesCercanasModal';
 import LocationFallbackModal from './components/LocationFallbackModal';
 
@@ -31,6 +33,14 @@ export default function App() {
   // Estado para el DetailDrawer de métricas y auditoría
   const [selectedMetric, setSelectedMetric] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  
+  // Estado para Calidad del Aire (AQI)
+  const [selectedAqiData, setSelectedAqiData] = useState(null);
+  const [aqiDrawerOpen, setAqiDrawerOpen] = useState(false);
+
+  // Estado para Pronóstico Horario
+  const [selectedDayHourly, setSelectedDayHourly] = useState(null);
+  const [hourlyDrawerOpen, setHourlyDrawerOpen] = useState(false);
 
   const mapRef = useRef(null);
   const forecastRef = useRef(null);
@@ -93,6 +103,16 @@ export default function App() {
     setDrawerOpen(true);
   };
 
+  const handleOpenAqi = (aqiData) => {
+    setSelectedAqiData(aqiData);
+    setAqiDrawerOpen(true);
+  };
+
+  const handleOpenHourly = (dayHourlyData) => {
+    setSelectedDayHourly(dayHourlyData);
+    setHourlyDrawerOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-[#080c14] text-slate-100 flex flex-col font-sans selection:bg-sky-500 selection:text-slate-950">
       
@@ -130,6 +150,7 @@ export default function App() {
                 urbano={climaData?.modo_urbano}
                 onSelectMetric={handleSelectMetric}
                 stationInfo={climaData?.estacion}
+                onOpenAqi={handleOpenAqi}
               />
             ) : (
               <AgroPanel
@@ -153,7 +174,9 @@ export default function App() {
             <div ref={forecastRef} className="space-y-6">
               <DailyForecastCards
                 dailyForecast={climaData?.pronostico_numerico_openmeteo?.diario_7dias}
+                hourlyForecast={climaData?.pronostico_numerico_openmeteo?.horario}
                 onSelectMetric={handleSelectMetric}
+                onOpenHourly={handleOpenHourly}
               />
 
               <ComparisonTable
@@ -200,6 +223,20 @@ export default function App() {
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         detailData={selectedMetric}
+      />
+
+      {/* DRAWER DESPLEGABLE CALIDAD DEL AIRE */}
+      <AqiDrawer
+        isOpen={aqiDrawerOpen}
+        onClose={() => setAqiDrawerOpen(false)}
+        data={selectedAqiData}
+      />
+
+      {/* DRAWER DESPLEGABLE PRONÓSTICO HORARIO */}
+      <HourlyForecastDrawer
+        isOpen={hourlyDrawerOpen}
+        onClose={() => setHourlyDrawerOpen(false)}
+        dayData={selectedDayHourly}
       />
 
       {/* FALLBACK DE UBICACIÓN */}

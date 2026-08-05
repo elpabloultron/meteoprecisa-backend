@@ -53,7 +53,7 @@ def construir_transparency_metadata(last_up_ts: int, boletin_dmc: dict = None, e
         "raw_source_url": raw_url,
         "is_live_data": True,
         "source_name": f"Dirección Meteorológica de Chile ({red_name}) / Google Earth Engine",
-        "last_fetched_timestamp": time.strftime("%Y-%m-%dT%H:00:00Z", time.gmtime(last_ts)),
+        "last_fetched_timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(last_ts)),
         "updated_ago_str": updated_str,
         "updated_at_label": f"Actualización a las {time_str} hrs",
         "official_bulletin": boletin_txt or "Predominio de estabilidad atmosférica en la zona central y valles interiores de Chile."

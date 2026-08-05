@@ -1,7 +1,7 @@
 import React from 'react';
 import { Wind, Thermometer, Droplets, Sun, Activity, ShieldCheck, AlertTriangle, ChevronRight } from 'lucide-react';
 
-export default function UrbanPanel({ urbano, onSelectMetric, stationInfo }) {
+export default function UrbanPanel({ urbano, onSelectMetric, stationInfo, onOpenAqi }) {
   if (!urbano) return null;
 
   const {
@@ -57,7 +57,7 @@ export default function UrbanPanel({ urbano, onSelectMetric, stationInfo }) {
       
       {/* CAJA DE ESTADO Y AUDITORÍA SINCA MMA */}
       <div
-        onClick={() => handleCardClick("Calidad del Aire SINCA MMA", sincaNom, `MP2.5: ${mp25Val} µg/m³`, "Categorización oficial según el Decreto Supremo D.S. 12/2011 del Ministerio del Medio Ambiente de Chile para material particulado respirable.", "Evitar actividad física intensa al aire libre si la categoría es Alerta o Preemergencia.", "Medio Ambiente")}
+        onClick={() => onOpenAqi && onOpenAqi({ mp25: mp25Val, mp10: calidad_aire_sinca?.mediciones_base?.mp10_ug_m3 || null, aqi: aqiVal, norma: sincaNom })}
         className={`p-4 rounded-xl border flex items-center justify-between gap-3 font-medium text-sm cursor-pointer transition hover:opacity-95 ${statusBg}`}
       >
         <div className="flex items-center gap-3">
@@ -129,7 +129,7 @@ export default function UrbanPanel({ urbano, onSelectMetric, stationInfo }) {
 
         {/* CALIDAD DEL AIRE SINCA */}
         <div
-          onClick={() => handleCardClick("Norma de Calidad del Aire (MMA)", sincaNom, `MP2.5: ${mp25Val}`, "Índice de calidad de aire en tiempo real informado por la red SINCA del Ministerio del Medio Ambiente.", "Revisar restricciones de calefacción en valles saturados.", "MMA Chile")}
+          onClick={() => onOpenAqi && onOpenAqi({ mp25: mp25Val, mp10: calidad_aire_sinca?.mediciones_base?.mp10_ug_m3 || null, aqi: aqiVal, norma: sincaNom })}
           className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2 cursor-pointer hover:border-sky-500/40 hover:bg-slate-850 transition group"
         >
           <div className="flex items-center justify-between text-xs text-slate-400">
