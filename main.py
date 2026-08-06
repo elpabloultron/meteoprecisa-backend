@@ -405,17 +405,35 @@ async def obtener_clima_hiperlocal(
     est_id = estacion_cercana.get("id")
     telemetria_directa = telemetria_map.get(est_id, {})
 
-    # Calidad de aire SINCA
+    # Calidad de aire (Unificando SINCA y PurpleAir)
     sinca_map = CACHE_MEMORIA.get("calidad_aire_sinca", {})
-    sinca_info = None
-    for _, s_data in sinca_map.items():
-        sinca_info = s_data
-        break
+    purple_map = CACHE_MEMORIA.get("calidad_aire_purpleair", {})
+    
+    todas_caq = list(sinca_map.values()) + list(purple_map.values())
+    estacion_caq_cercana = None
+    dist_min_caq = float("inf")
+    
+    # Algunas estaciones de calidad de aire (como SINCA fallback) podrían no tener lat/lon
+    # PurpleAir tiene lat/lon. Si no hay lat/lon asumo distancia infinita.
+    for aq in todas_caq:
+        if aq.get("lat") and aq.get("lon"):
+            d = calcular_distancia(lat, lon, aq["lat"], aq["lon"])
+        else:
+            d = 999999
+        if d < dist_min_caq:
+            dist_min_caq = d
+            estacion_caq_cercana = aq
+
+    sinca_info = estacion_caq_cercana
 
     calidad_aire_eval = calcular_calidad_aire_dual(
         sinca_info.get("pm25") if sinca_info else 15.0,
         sinca_info.get("pm10") if sinca_info else 30.0
     )
+    if sinca_info:
+        calidad_aire_eval["estacion_fuente"] = f"{sinca_info.get('estacion_nombre', 'Sensor')} ({round(dist_min_caq, 1)} km)"
+        calidad_aire_eval["pm25_raw"] = sinca_info.get("pm25")
+        calidad_aire_eval["pm10_raw"] = sinca_info.get("pm10")
 
     # Open-Meteo para pronóstico numérico con Caché en Memoria (15 minutos)
     key_om = (round(estacion_cercana['lat'], 2), round(estacion_cercana['lon'], 2))

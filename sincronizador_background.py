@@ -213,106 +213,51 @@ async def sincronizar_agromet_inia(client: httpx.AsyncClient) -> tuple[dict, lis
         print(f"   ⚠️ Error sincronizando Agromet INIA: {e}")
     return telemetria_map, estaciones_catalogo
 
-REDMETEO_COORDENADAS = {
-    "sctl": (-33.4489, -70.6693),
-    "scat": (-33.3930, -70.7858),
-    "sclc": (-33.3833, -70.5500),
-    "scel": (-33.3930, -70.7858),
-    "scvi": (-33.0245, -71.5518),
-    "sctp": (-38.7397, -72.5901),
-    "scie": (-36.7728, -73.0631),
-    "scos": (-40.5739, -73.1347),
-    "scpu": (-41.4717, -72.9369),
-    "scvj": (-31.6308, -71.1653)
-}
-
-REGION_FALLBACKS = {
-    "metropolitana": (-33.4489, -70.6693),
-    "valparaíso": (-33.0472, -71.6127),
-    "valparaiso": (-33.0472, -71.6127),
-    "coquimbo": (-29.9533, -71.3395),
-    "o'higgins": (-34.1701, -70.7444),
-    "ohiggins": (-34.1701, -70.7444),
-    "maule": (-35.4264, -71.6554),
-    "ñuble": (-36.6066, -72.1034),
-    "nuble": (-36.6066, -72.1034),
-    "biobío": (-36.8270, -73.0503),
-    "biobio": (-36.8270, -73.0503),
-    "araucanía": (-38.7397, -72.5901),
-    "araucania": (-38.7397, -72.5901),
-    "los ríos": (-39.8142, -73.2459),
-    "los rios": (-39.8142, -73.2459),
-    "los lagos": (-41.4717, -72.9369),
-    "aysén": (-45.5752, -72.0662),
-    "aysen": (-45.5752, -72.0662),
-    "magallanes": (-53.1638, -70.9171)
-}
-
 async def sincronizar_redmeteo(client: httpx.AsyncClient) -> tuple[dict, list[dict]]:
-    url = "https://redmeteo.cl/movil.htm"
-    print("🏔️ [Sync Background] Consultando RedMeteo.cl en vivo...")
+    url = "https://redmeteo.cl/last-data.json"
+    print("🏔️ [Sync Background] Consultando RedMeteo.cl (JSON API)...")
     telemetria_map = {}
     estaciones_catalogo = []
     try:
         resp = await client.get(url, timeout=15.0)
         if resp.status_code == 200:
-            soup = BeautifulSoup(resp.text, "html.parser")
-            rows = soup.find_all("tr")
-            for row in rows[1:]:
-                cols = [td.text.strip() for td in row.find_all("td")]
-                if len(cols) >= 13:
-                    indicativo = cols[0]
-                    nombre = cols[1]
-                    region = cols[2]
-                    temp = clean_num(cols[5])
-                    hum = clean_num(cols[6])
-                    viento_ms = clean_num(cols[7])
-                    dir_viento = clean_num(cols[8])
-                    presion = clean_num(cols[9])
-                    radiacion = clean_num(cols[10])
-                    lluvia = clean_num(cols[11])
-                    rocio = clean_num(cols[12])
-
-                    ind_lower = indicativo.lower().strip()
-                    est_id = f"redmeteo_{ind_lower}"
-                    vkmh = round(viento_ms * 3.6, 1) if viento_ms is not None else 0.0
-
-                    # Resolver coordenadas por indicativo o por región
-                    if ind_lower in REDMETEO_COORDENADAS:
-                        lat, lon = REDMETEO_COORDENADAS[ind_lower]
-                    else:
-                        reg_lower = region.lower().strip()
-                        lat, lon = REGION_FALLBACKS.get(reg_lower, (-33.4489, -70.6693))
-
+            data = resp.json()
+            for item in data:
+                est_id = f"redmeteo_{item.get('id_estacion', '').lower()}"
+                lat = item.get("latitud")
+                lon = item.get("longitud")
+                nombre = item.get("nombre", "")
+                region = item.get("region", "Chile")
+                
+                if est_id and lat and lon:
                     telemetria_map[est_id] = {
                         "id": est_id,
-                        "indicativo": indicativo,
+                        "indicativo": item.get("id_estacion"),
                         "nombre": f"Estación RedMeteo {nombre}",
-                        "lat": lat,
-                        "lon": lon,
-                        "temperatura_c": temp or 0.0,
-                        "humedad_relativa": int(hum or 0),
-                        "viento_kmh": vkmh,
-                        "direccion_viento_grados": int(dir_viento or 0),
-                        "punto_rocio_c": rocio or 0.0,
-                        "presion_hpa": presion or 1013.25,
-                        "radiacion_w_m2": radiacion or 0.0,
-                        "lluvia_mm": lluvia or 0.0,
+                        "lat": float(lat),
+                        "lon": float(lon),
+                        "temperatura_c": clean_num(item.get("temperatura")) or 0.0,
+                        "humedad_relativa": int(clean_num(item.get("humedad")) or 0),
+                        "viento_kmh": clean_num(item.get("velocidad_viento")) or 0.0,
+                        "direccion_viento_grados": int(clean_num(item.get("direccion_viento")) or 0),
+                        "punto_rocio_c": clean_num(item.get("punto_rocio")) or 0.0,
+                        "presion_hpa": clean_num(item.get("presion_absoluta")) or 1013.25,
+                        "radiacion_w_m2": clean_num(item.get("radiacion_solar")) or 0.0,
+                        "lluvia_mm": clean_num(item.get("lluviadiaria")) or 0.0,
                         "timestamp_actualizacion": int(time.time())
                     }
 
                     estaciones_catalogo.append({
                         "id": est_id,
-                        "code_red": indicativo,
+                        "code_red": item.get("id_estacion"),
                         "nombre": f"Estación RedMeteo {nombre}",
-                        "sector": f"{nombre}, {region}",
+                        "sector": f"{region}",
                         "red": "RedMeteo Chile",
                         "tipo_api": "redmeteo",
-                        "lat": lat,
-                        "lon": lon
+                        "lat": float(lat),
+                        "lon": float(lon)
                     })
-            print(f"   ✅ RedMeteo.cl procesado ({len(estaciones_catalogo)} estaciones en vivo con geolocalización)")
-
+            print(f"   ✅ RedMeteo.cl procesado ({len(estaciones_catalogo)} estaciones en vivo con geolocalización exacta)")
     except Exception as e:
         print(f"   ⚠️ Error sincronizando RedMeteo: {e}")
     return telemetria_map, estaciones_catalogo
@@ -398,6 +343,49 @@ async def sincronizar_calidad_aire_sinca() -> dict:
         }
         print("   ℹ️ Usando catálogo activo base de SINCA MMA")
     return sinca_map
+
+async def sincronizar_purpleair(client: httpx.AsyncClient) -> dict:
+    print("🟣 [Sync Background] Consultando PurpleAir (Calidad del Aire Hiperlocal)...")
+    purple_map = {}
+    url = "https://api.purpleair.com/v1/sensors?fields=name,latitude,longitude,pm2.5_cf_1,pm10.0_cf_1,humidity,temperature,pressure&nwlng=-76&nwlat=-17&selng=-66&selat=-56"
+    api_key = "E7E65884-9135-11F1-9E30-4201AC1DC129"
+    try:
+        resp = await client.get(url, headers={"X-API-Key": api_key}, timeout=15.0)
+        if resp.status_code == 200:
+            data = resp.json()
+            fields = data.get("fields", [])
+            sensors = data.get("data", [])
+            for row in sensors:
+                sensor = dict(zip(fields, row))
+                est_id = f"purpleair_{sensor.get('sensor_index')}"
+                lat = clean_num(sensor.get("latitude"))
+                lon = clean_num(sensor.get("longitude"))
+                if not lat or not lon:
+                    continue
+                
+                # PurpleAir temperature is in Fahrenheit. Convert to Celsius.
+                temp_f = clean_num(sensor.get("temperature"))
+                temp_c = round((temp_f - 32) * 5.0 / 9.0, 1) if temp_f is not None else 0.0
+                
+                purple_map[est_id] = {
+                    "id": est_id,
+                    "estacion_nombre": f"Estación PurpleAir {sensor.get('name', 'Sensor')}",
+                    "comuna": "PurpleAir",
+                    "region": "Chile",
+                    "pm25": clean_num(sensor.get("pm2.5_cf_1")) or 0.0,
+                    "pm10": clean_num(sensor.get("pm10.0_cf_1")) or 0.0,
+                    "temperatura_c": temp_c,
+                    "humedad_relativa": int(clean_num(sensor.get("humidity")) or 0),
+                    "presion_hpa": clean_num(sensor.get("pressure")) or 1013.25,
+                    "lat": lat,
+                    "lon": lon,
+                    "timestamp": int(time.time())
+                }
+            print(f"   ✅ PurpleAir procesado ({len(purple_map)} sensores en vivo)")
+    except Exception as e:
+        print(f"   ⚠️ Error sincronizando PurpleAir: {e}")
+    return purple_map
+
 
 async def sincronizar_pronostico_oficial_dmc(client: httpx.AsyncClient) -> dict:
     print("📜 [Sync Background] Consultando Boletín de Pronóstico Oficial DMC Chile...")
@@ -493,11 +481,12 @@ async def ejecutar_sincronizacion_completa():
         # Lanzar generación de bucle WebP GOES-19 asíncronamente
         asyncio.create_task(procesar_video_goes19())
         
-        (dmc_tele, dmc_cat), (agromet_tele, agromet_cat), (redmeteo_tele, redmeteo_cat), sinca_data, dmc_boletin, senapred_data, _ = await asyncio.gather(
+        (dmc_tele, dmc_cat), (agromet_tele, agromet_cat), (redmeteo_tele, redmeteo_cat), sinca_data, purpleair_data, dmc_boletin, senapred_data, _ = await asyncio.gather(
             sincronizar_dmc_telemetria(client),
             sincronizar_agromet_inia(client),
             sincronizar_redmeteo(client),
             sincronizar_calidad_aire_sinca(),
+            sincronizar_purpleair(client),
             sincronizar_pronostico_oficial_dmc(client),
             sincronizar_alertas_senapred(client),
             sincronizar_puntos_gee(),
@@ -507,6 +496,8 @@ async def ejecutar_sincronizacion_completa():
     
     if isinstance(sinca_data, dict):
         CACHE_MEMORIA["calidad_aire_sinca"] = sinca_data
+    if isinstance(purpleair_data, dict):
+        CACHE_MEMORIA["calidad_aire_purpleair"] = purpleair_data
     if isinstance(dmc_boletin, dict):
         CACHE_MEMORIA["pronostico_oficial_dmc"] = dmc_boletin
     if isinstance(senapred_data, list):
