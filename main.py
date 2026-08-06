@@ -621,4 +621,28 @@ async def forzar_sincronizacion_manual():
     return {
         "status": "ok",
         "mensaje": "Sincronización en segundo plano iniciada inmediatamente."
-    }
+    }
+
+@app.get("/api/v1/weather/historico")
+async def obtener_historico_ndvi(
+    lat: float = Query(..., description="Latitud GPS"),
+    lng: float | None = Query(None, description="Longitud GPS (lng)"),
+    lon: float | None = Query(None, description="Longitud GPS (lon)")
+):
+    longitud_final = lng if lng is not None else lon
+    if longitud_final is None:
+        raise HTTPException(status_code=400, detail="Debe proporcionar el parámetro 'lng' o 'lon'.")
+    
+    # El llamado a GEE MODIS para 12 meses puede tardar 2 a 4 segundos
+    from gee.rural import extraer_historico_ndvi
+    try:
+        # Ejecutamos en thread para no bloquear el Event Loop de FastAPI
+        timeseries = await asyncio.to_thread(extraer_historico_ndvi, lat, longitud_final)
+        return {
+            "status": "success",
+            "lat": lat,
+            "lon": longitud_final,
+            "historico_ndvi_12_meses": timeseries
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

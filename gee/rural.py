@@ -128,3 +128,47 @@ def fallback_rural(lat: float, lon: float) -> dict:
         "radiacion_solar_gee_w_m2": 250.0,
         "fuente_rural": "GEE - Cache / Fallback Calibrado"
     }
+
+def extraer_historico_ndvi(lat: float, lon: float) -> list:
+    """Extrae serie de tiempo NDVI de los últimos 12 meses usando MODIS MOD13Q1."""
+    if not GEECore.is_active():
+        # Fallback de prueba para desarrollo si no hay GEE
+        import datetime
+        import random
+        base = datetime.datetime.now()
+        return [{"fecha": (base - datetime.timedelta(days=30*i)).strftime("%Y-%m-%d"), "ndvi": round(random.uniform(0.3, 0.8), 2)} for i in range(12)][::-1]
+
+    try:
+        point = ee.Geometry.Point([lon, lat])
+        
+        # MOD13Q1 tiene NDVI cada 16 días
+        modis = ee.ImageCollection('MODIS/061/MOD13Q1') \
+            .filterBounds(point) \
+            .limit(24, 'system:time_start', False) \
+            .select('NDVI')
+            
+        def extract_value(img):
+            date = img.date().format('YYYY-MM-dd')
+            val = img.reduceRegion(
+                reducer=ee.Reducer.mean(),
+                geometry=point,
+                scale=250
+            ).get('NDVI')
+            return ee.Feature(None, {'fecha': date, 'ndvi': val})
+            
+        timeseries = modis.map(extract_value).getInfo()
+        
+        results = []
+        if 'features' in timeseries:
+            for feat in timeseries['features']:
+                props = feat['properties']
+                # MODIS NDVI factor de escala es 0.0001
+                val = props.get('ndvi')
+                if val is not None:
+                    ndvi = round(float(val) * 0.0001, 2)
+                    results.append({"fecha": props.get('fecha'), "ndvi": ndvi})
+                    
+        return results[::-1] # Retornar orden cronológico
+    except Exception as e:
+        print(f"⚠️ Error GEE (Historico): {e}")
+        return []

@@ -1,7 +1,8 @@
 import React from 'react';
 import { Sprout, Snowflake, Sun, Wind, CloudRain, Cpu, ChevronRight } from 'lucide-react';
+import HistoricalChart from './HistoricalChart';
 
-export default function AgroPanel({ agricola, onSelectMetric, stationInfo }) {
+export default function AgroPanel({ agricola, onSelectMetric, stationInfo, apiBase }) {
   if (!agricola) return null;
 
   const {
@@ -229,6 +230,13 @@ export default function AgroPanel({ agricola, onSelectMetric, stationInfo }) {
         </div>
 
       </div>
+
+      {/* GRÁFICO HISTÓRICO NDVI (12 MESES) */}
+      <HistoricalChart 
+        lat={stationInfo?.lat} 
+        lon={stationInfo?.lon} 
+        apiBase={apiBase || ""} 
+      />
 
     </div>
   );

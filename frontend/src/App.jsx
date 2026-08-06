@@ -124,6 +124,7 @@ export default function App() {
                 agricola={climaData?.modo_agricola}
                 onSelectMetric={handleSelectMetric}
                 stationInfo={climaData?.estacion}
+                apiBase={API_BASE}
               />
             )}
 
