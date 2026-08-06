@@ -22,12 +22,12 @@ def extraer_metricas_urbanas(lat: float, lon: float) -> dict:
         ).getInfo()
         
         # 2. MODIS / Landsat: Temperatura de Superficie LST (Isla de Calor)
-        # Usaremos MODIS LST (MOD11A2) para tener datos térmicos regulares
-        modis_lst = ee.ImageCollection('MODIS/061/MOD11A2') \
+        # Usaremos MODIS LST (MOD11A1 - Diario)
+        modis_lst = ee.ImageCollection('MODIS/061/MOD11A1') \
             .filterBounds(point) \
             .select('LST_Day_1km') \
             .limit(3, 'system:time_start', False) \
-            .mean()
+            .median()
             
         lst_reduced = modis_lst.reduceRegion(
             reducer=ee.Reducer.mean(), geometry=point, scale=1000

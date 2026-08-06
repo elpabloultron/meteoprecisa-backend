@@ -533,6 +533,8 @@ async def obtener_clima_hiperlocal(
         "estado_humedad_suelo": gee_punto["rural"]["estado_humedad_suelo"],
         "indice_biomasa_evi": gee_punto["rural"]["indice_biomasa_evi"],
         "evapotranspiracion_real_mod16_mm_dia": gee_punto["rural"]["evapotranspiracion_real_mod16_mm_dia"],
+        "precipitacion_mensual_chirps_mm": gee_punto["rural"].get("precipitacion_mensual_chirps_mm", 0.0),
+        "radiacion_solar_gee_w_m2": gee_punto["rural"].get("radiacion_solar_gee_w_m2", 250.0),
         "radiacion_solar_w_m2": round(float(telemetria_directa.get("radiacion_w_m2", 250.0)), 1),
         "rafagas_viento_kmh": round(float(curr_om.get("wind_gusts_10m", viento_final * 1.3)), 1),
         "lluvia_caida_hoy_mm": round(float(precip_hoy), 1),

@@ -26,14 +26,14 @@ def extraer_metricas_agricolas(lat: float, lon: float) -> dict:
             reducer=ee.Reducer.mean(), geometry=point, scale=10, maxPixels=1e6
         ).getInfo()
         
-        # 2. ERA5-Land: Humedad de Suelo
-        era5 = ee.ImageCollection('ECMWF/ERA5_LAND/HOURLY') \
+        # 2. GLDAS: Humedad de Suelo (SoilMoi0_10cm_inst)
+        gldas = ee.ImageCollection('NASA/GLDAS/V021/NOAH/G025/T3H') \
             .filterBounds(point) \
-            .filterDate('2025-12-01', '2026-04-01') \
-            .select('volumetric_soil_water_layer_1') \
-            .median()
-        soil_reduced = era5.reduceRegion(
-            reducer=ee.Reducer.mean(), geometry=point, scale=1000
+            .select('SoilMoi0_10cm_inst') \
+            .limit(3, 'system:time_start', False) \
+            .mean()
+        soil_reduced = gldas.reduceRegion(
+            reducer=ee.Reducer.mean(), geometry=point, scale=27830
         ).getInfo()
         
         # 3. MODIS: Evapotranspiración Real (MOD16A2)
@@ -45,19 +45,50 @@ def extraer_metricas_agricolas(lat: float, lon: float) -> dict:
         et_reduced = modis_et.reduceRegion(
             reducer=ee.Reducer.mean(), geometry=point, scale=500
         ).getInfo()
+
+        # 4. CHIRPS: Precipitación Acumulada Mensual (Histórico)
+        chirps = ee.ImageCollection('UCSB-CHG/CHIRPS/DAILY') \
+            .filterBounds(point) \
+            .limit(30, 'system:time_start', False) \
+            .select('precipitation') \
+            .sum()
+        chirps_reduced = chirps.reduceRegion(
+            reducer=ee.Reducer.mean(), geometry=point, scale=5566
+        ).getInfo()
+
+        # 5. ERA5-Land: Radiación Solar (surface_solar_radiation_downwards)
+        era5 = ee.ImageCollection('ECMWF/ERA5_LAND/HOURLY') \
+            .filterBounds(point) \
+            .limit(24, 'system:time_start', False) \
+            .select('surface_solar_radiation_downwards') \
+            .mean()
+        solar_reduced = era5.reduceRegion(
+            reducer=ee.Reducer.mean(), geometry=point, scale=11132
+        ).getInfo()
         
         # Procesar valores
         ndvi_val = s2_reduced.get('NDVI')
         ndwi_val = s2_reduced.get('NDWI')
-        soil_val = soil_reduced.get('volumetric_soil_water_layer_1')
+        soil_val = soil_reduced.get('SoilMoi0_10cm_inst')
         et_val = et_reduced.get('ET')
+        precip_val = chirps_reduced.get('precipitation')
+        solar_val = solar_reduced.get('surface_solar_radiation_downwards')
         
         # Fallback de seguridad individual si un satélite específico falla
         ndvi_res = round(float(ndvi_val), 2) if ndvi_val else 0.65
         ndwi_res = round(float(ndwi_val), 2) if ndwi_val else 0.32
-        soil_res = round(float(soil_val), 2) if soil_val else 0.28
+        
+        # GLDAS viene en kg/m^2 (equivalente a mm). Escalar a porcentaje volumétrico aprox para consistencia UI
+        soil_res = round((float(soil_val) / 100.0), 2) if soil_val else 0.28
+        
         # ET de MODIS viene multiplicado por 10, hay que escalar a mm/8dias, luego dividimos a mm/dia
         et_res = round(float(et_val) * 0.1 / 8.0, 2) if et_val else 3.5 
+
+        # CHIRPS mm/mes
+        precip_res = round(float(precip_val), 1) if precip_val else 12.0
+        
+        # ERA5 Radiación (J/m² -> W/m²) dividido por 3600
+        solar_res = round(float(solar_val) / 3600.0, 1) if solar_val else 250.0
         
         estado_vigor = "Vigor Vegetativo Excelente 🌿" if ndvi_res >= 0.60 else ("Vigor Moderado 🌾" if ndvi_res >= 0.35 else "Vegetación Escasa 🏜️")
         estado_ndwi = "Sin Estrés Hídrico 💧" if ndwi_res >= 0.30 else "Estrés Hídrico Detectado ⚠️"
@@ -72,7 +103,9 @@ def extraer_metricas_agricolas(lat: float, lon: float) -> dict:
             "estado_humedad_suelo": estado_humedad,
             "indice_biomasa_evi": round(ndvi_res * 0.85, 2),
             "evapotranspiracion_real_mod16_mm_dia": et_res,
-            "fuente_rural": "Google Earth Engine (Sentinel-2, ERA5, MODIS)"
+            "precipitacion_mensual_chirps_mm": precip_res,
+            "radiacion_solar_gee_w_m2": solar_res,
+            "fuente_rural": "GEE (S2, GLDAS, CHIRPS, ERA5, MODIS)"
         }
     except Exception as e:
         print(f"⚠️ Error GEE (Rural): {e}")
@@ -91,5 +124,7 @@ def fallback_rural(lat: float, lon: float) -> dict:
         "estado_humedad_suelo": "Humedad Adecuada para Desarrollo 🟢",
         "indice_biomasa_evi": evi,
         "evapotranspiracion_real_mod16_mm_dia": round(3.4 + (math.sin(abs_lat * 0.5) * 0.8), 1),
+        "precipitacion_mensual_chirps_mm": 12.0,
+        "radiacion_solar_gee_w_m2": 250.0,
         "fuente_rural": "GEE - Cache / Fallback Calibrado"
     }
