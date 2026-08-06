@@ -64,12 +64,6 @@ export default function App() {
     }
   };
 
-  const handleSelectStation = (est) => {
-    if (est.lat && est.lon) {
-      setCoords({ lat: est.lat, lon: est.lon });
-    }
-  };
-
   const handleSelectMetric = (metricInfo) => {
     setSelectedMetric(metricInfo);
     setDrawerOpen(true);
