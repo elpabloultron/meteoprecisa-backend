@@ -15,6 +15,8 @@ service_account*.json
 # Bases de datos y cachés locales generadas en tiempo de ejecución
 base_datos.sqlite
 base_datos.sqlite-journal
+cache_servidor.json
+base_datos.sqlite-journal
 .pytest_cache/
 .firebase/
 *.tmp

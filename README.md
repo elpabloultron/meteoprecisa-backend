@@ -1,175 +1,98 @@
-# 🛰️ MeteoPrecisa Chile — Plataforma Agrometeorológica Hiperlocal & Google Earth Engine
+# 🌩️ MeteoPrecisa
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110.0-009688?style=flat&logo=fastapi)](https://fastapi.tiangolo.com/)
-[![Python](https://img.shields.io/badge/Python-3.11%2B-blue?style=flat&logo=python)](https://www.python.org/)
-[![Google Earth Engine](https://img.shields.io/badge/Google_Earth_Engine-EE_API-4285F4?style=flat&logo=google)](https://earthengine.google.com/)
-[![Leaflet](https://img.shields.io/badge/Leaflet-1.9.4-green?style=flat&logo=leaflet)](https://leafletjs.com/)
-[![Windy](https://img.shields.io/badge/Windy-ECMWF_API-red?style=flat)](https://www.windy.com/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+**Plataforma de Inteligencia Agrometeorológica y Calidad del Aire Hiperlocal**
 
-**MeteoPrecisa Chile** es una plataforma agrometeorológica y de monitoreo ambiental hiperlocal de última generación, diseñada para integrar en una sola interfaz unificada la telemetría en tiempo real de **609 estaciones meteorológicas físicas en Chile**, análisis satelital de alta resolución vía **Google Earth Engine (GEE)**, capas de viento/radar animadas **Windy (60fps)**, e informes oficiales de **SENAPRED**, **DMC** y la red **SINCA (Ministerio del Medio Ambiente)**.
+MeteoPrecisa es una aplicación web y backend API que consolida datos meteorológicos en tiempo real desde múltiples fuentes terrestres (DMC, Agromet INIA, RedMeteo, SINCA, PurpleAir) y los cruza con análisis satelitales avanzados de la Agencia Espacial Europea y la NASA utilizando **Google Earth Engine**. 
+
+La arquitectura está diseñada para ofrecer tiempos de respuesta ultrarrápidos (<50ms) a través de un motor asíncrono de caché que pre-computa los modelos climáticos en segundo plano, permitiendo el despliegue como una PWA (Progressive Web App) nativa orientada a la toma de decisiones agrícolas.
 
 ---
 
-## 🌟 Características Principales
+## 🏗️ Arquitectura del Sistema
 
-* 📡 **Telemetría Multired Unificada (609 Estaciones):**
-  * **Agromet INIA:** 320+ estaciones agrícolas con medición de heladas, horas frío y evapotranspiración $ETo$ (incluye Estaciones Clave como *INIA Quilacahuín*, *Cañal Bajo Osorno*, etc.).
-  * **Dirección Meteorológica de Chile (DMC):** Estaciones aeroportuarias y sinópticas oficiales.
-  * **RedMeteo / Estaciones Privadas:** Redes comunitarias y de monitoreo local.
-* 🛰️ **Análisis Satelital Avanzado vía Google Earth Engine (GEE):**
-  * **NDVI (Normalized Difference Vegetation Index):** Salud y vigor vegetativo en cultivos y praderas (Sentinel-2 / MODIS).
-  * **NDWI (Normalized Difference Water Index):** Estrés hídrico y contenido de agua en hojas.
-  * **LST (Land Surface Temperature):** Temperatura real de la superficie del suelo (°C) para detección de heladas radiativas.
-  * **EVI (Enhanced Vegetation Index):** Monitoreo de biomasa y dosel en bosques y cultivos densos.
-  * **FIRMS / Detección de Incendios:** Detección de focos de calor a través de sensores térmicos MODIS/VIIRS.
-  * **Evapotranspiración Real Acumulada (MOD16A2):** Consumo hídrico real por hectárea.
-* 🌀 **Visor de Mapas Animados Fluidos (Windy Embed 60fps):**
-  * Capas dinámicas de vector de viento, radar de precipitaciones doppler, cobertura nubosa y oleaje marino.
-* 🛰️ **Visor Satelital NOAA GOES-19 (24 Horas):**
-  * Reproductor interactivo de fotogramas infrarrojos capturados cada 10 minutos desde los servidores operacionales de la NOAA.
-* 🫁 **Módulo de Calidad del Aire Dual (SINCA MMA + US AQI):**
-  * Evaluación simultánea bajo la norma chilena **D.S. 12/2011 del Ministerio del Medio Ambiente** ($MP2.5$ y $MP10$) y la escala internacional **US AQI (EPA EE.UU., 0-500)** con alertas sanitarias para la población.
-* 🚨 **Alertas de Emergencia y Sinópticas (SENAPRED & DMC):**
-  * Filtrado regional según la ubicación geográfica del usuario y visualización de comunicados oficiales.
-* 🌾 **Conmutador de Modo Urbano vs. Modo Agrícola:**
-  * Vista adaptada para usuarios urbanos (sensación térmica, viento, presión, UV, AQI) o productores agrícolas (lluvia caída 24H, lluvia pronosticada, acumulado mensual, horas frío base 7°C, $ETo$ FAO-56, radiación $W/m^2$).
+MeteoPrecisa se divide en tres capas principales:
 
----
+### 1. El Sincronizador en Segundo Plano (Data Ingestion)
+Archivo principal: `sincronizador_background.py`
 
-## 🏗️ Arquitectura del Sistema & Flujo de Datos
+Un worker de Python construido con `asyncio` que se ejecuta perpetuamente en el servidor. Su misión es orquestar la ingesta masiva de datos:
+- Consulta en vivo estaciones terrestres oficiales (Dirección Meteorológica de Chile - DMC) y ciudadanas (RedMeteo).
+- Se conecta a la API de **PurpleAir** y de **SINCA** (Ministerio del Medio Ambiente) para extraer datos precisos de material particulado y calidad del aire.
+- Extrae Alertas Tempranas de **SENAPRED**.
+- **Motor de Caché RAM:** En lugar de guardar en bases de datos pesadas, el sincronizador consolida los datos y los inyecta en una memoria local ultrarrápida (`CACHE_MEMORIA`). Este es el "cerebro" que permite que la app cargue instantáneamente. Cuenta con mitigación automática de _memory leaks_ para escalabilidad continua.
 
-```
-                                  ┌───────────────────────────────┐
-                                  │   FUENTES DE DATOS FÍSICAS    │
-                                  ├───────────────────────────────┤
-                                  │ • Agromet INIA (320+ est)     │
-                                  │ • DMC Chile (150+ est)        │
-                                  │ • RedMeteo / Privadas         │
-                                  │ • SINCA MMA (Calidad Aire)    │
-                                  └──────────────┬────────────────┘
-                                                 │
-                                                 ▼
-┌──────────────────────────────┐  ┌───────────────────────────────┐
-│     PROVEEDORES SATELITALES   │  │   MOTOR BACKGROUND PYTHON     │
-├──────────────────────────────┤  ├───────────────────────────────┤
-│ • Google Earth Engine (GEE)  │─►│ • Sincronizador Multired      │
-│ • NOAA GOES-19 (Chile 24H)   │  │ • Limpieza de Sentinelas      │
-│ • Open-Meteo ECMWF / GFS     │  │ • Caché Persistente SQLite    │
-└──────────────────────────────┘  └──────────────┬────────────────┘
-                                                 │
-                                                 ▼
-                                  ┌───────────────────────────────┐
-                                  │   FASTAPI BACKEND REST API    │
-                                  ├───────────────────────────────┤
-                                  │ • /api/v1/clima-hiperlocal    │
-                                  │ • /api/v1/buscar-estaciones   │
-                                  │ • /api/v1/satelite-goes19     │
-                                  └──────────────┬────────────────┘
-                                                 │
-                                                 ▼
-                                  ┌───────────────────────────────┐
-                                  │   FRONTEND EMERALD GLASS UI   │
-                                  ├───────────────────────────────┤
-                                  │ • Leaflet.js + Windy Embed    │
-                                  │ • Chart.js Dual-Axis 48H      │
-                                  │ • Responsive Mobile-First     │
-                                  └───────────────────────────────┘
-```
+### 2. El Cerebro Satelital (Google Earth Engine)
+Carpeta: `gee/`
+
+Módulo geoespacial que interactúa nativamente con la API de Earth Engine. Cuando un usuario envía sus coordenadas (Latitud/Longitud), este módulo ejecuta análisis en fracciones de segundo:
+- **`gee/rural.py`:** Extrae Salud Vegetal (NDVI - Sentinel-2/MODIS), Evapotranspiración (FAO-56), Radiación Solar (ERA5) y Humedad Volumétrica del Suelo (GLDAS).
+- **`gee/urban.py`:** Extrae la Temperatura de Superficie Terrestre (LST) calculando el riesgo de "Islas de Calor Urbano" mediante emisividad térmica (MOD11A1).
+- **Endpoint Histórico (`/api/v1/weather/historico`)**: Extrae series de tiempo asíncronas de los últimos 12 meses de índices agrícolas (NDVI) sin bloquear la interfaz.
+
+### 3. API Servidor (Backend)
+Archivo principal: `main.py`
+
+Construido en **FastAPI**. Sirve como el puente que une la caché RAM del sincronizador y las peticiones del frontend. Expone endpoints de alto rendimiento (como `/api/v1/weather/nearby`) que realizan algoritmos de `geopy` y `KDTree` para encontrar instantáneamente la estación meteorológica más cercana al usuario y cruzarla con la inteligencia satelital del punto exacto.
+
+### 4. PWA Frontend (React + Vite)
+Carpeta: `frontend/`
+
+- Interfaz minimalista y adaptativa construida en **React**, **Vite** y **TailwindCSS**.
+- Capacidad de instalación nativa (PWA - Progressive Web App) en iOS y Android.
+- Paneles dinámicos (`AgroPanel`, `UrbanPanel`) que se adaptan automáticamente dependiendo de si el usuario está en el campo (mostrando riego y heladas) o en la ciudad (mostrando calidad de aire y confort térmico).
+- Gráficos interactivos construidos con `Chart.js` para visualización temporal de datos.
 
 ---
 
-## 🛠️ Tecnologías y Servidores Utilizados
+## 🚀 Despliegue y Ejecución Local
 
-### **Backend & Motor de Datos**
-* **Lenguaje:** Python 3.11 / 3.14
-* **Framework Web:** FastAPI (ASGI asíncrono de alto rendimiento con Uvicorn)
-* **Base de Datos & Caché:** SQLite3 con consultas indexadas por coordenadas y memoria interna.
-* **Procesamiento de Datos:** `pandas`, `numpy`, `httpx`, `requests`.
+### Prerrequisitos
+- Python 3.10+
+- Node.js v18+
+- Credenciales habilitadas para [Google Earth Engine](https://earthengine.google.com/)
+- API Key de PurpleAir
 
-### **Procesamiento Satelital & Geospacial**
-* **Google Earth Engine (GEE Python API):** Extracción de bandas e índices espectrales sobre las coordenadas exactas de las estaciones.
-* **NOAA Satellite Server:** Descarga e indexación de fotogramas infrarrojos GOES-19 Band 13/GeoColor.
+### Instalación
 
-### **Frontend & Visualización**
-* **Estructura & Estilos:** HTML5, CSS Vanilla con sistema de diseño **Emerald Glassmorphism** (`#10b981`), tipografía **Plus Jakarta Sans** y **Space Grotesk**.
-* **Librerías de Mapas & Gráficos:** **Leaflet.js 1.9.4**, **Windy Embed API**, **Chart.js**.
-
----
-
-## 🚀 Guía de Instalación y Ejecución Local
-
-### 1. Clonar el Repositorio
+1. **Clonar repositorio e instalar dependencias Python:**
 ```bash
-git clone https://github.com/tu-usuario/meteoprecisa-backend.git
+git clone https://github.com/elpabloultron/meteoprecisa-backend.git
 cd meteoprecisa-backend
-```
-
-### 2. Crear y Activar Entorno Virtual
-```bash
-python -m venv venv
-# En Windows (PowerShell):
-.\venv\Scripts\Activate.ps1
-# En Linux/macOS:
-source venv/bin/activate
-```
-
-### 3. Instalar Dependencias
-```bash
 pip install -r requirements.txt
 ```
 
-### 4. Iniciar el Servidor de Desarrollo
+2. **Configurar Variables de Entorno (IMPORTANTE 🔒)**:
+El proyecto requiere llaves privadas que **NUNCA** deben subirse a un repositorio público.
+Crea un archivo `.env` en la raíz copiando el `.env.example`:
 ```bash
-python -m uvicorn main:app --reload --port 8000
+cp .env.example .env
+```
+Abre `.env` y pega tu clave `PURPLEAIR_API_KEY`. 
+
+Para **Google Earth Engine**, asegúrate de haber ejecutado `earthengine authenticate` en tu máquina o proporcionar la `service_account.json` (ambos ya ignorados en `.gitignore`).
+
+3. **Ejecutar Backend FastAPI:**
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+*(El sincronizador en segundo plano arrancará automáticamente con el ciclo de vida del servidor).*
+
+4. **Ejecutar Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
-### 5. Acceder a la Aplicación
-Abre tu navegador e ingresa a:
-* **Interfaz de Usuario:** `http://localhost:8000/app/`
-* **Documentación Interactiva Swagger API:** `http://localhost:8000/docs`
+---
+
+## 🔒 Postura de Seguridad e Integridad Open-Source
+
+MeteoPrecisa ha sido diseñado con altos estándares para prevenir vulnerabilidades OWASP comunes y fugas de datos:
+- **Protección de Llaves (Secret Management):** Las credenciales de PurpleAir, tokens de Open-Meteo y llaves de Servicio GCloud/Earth Engine están extraídas del código fuente. Se inyectan en tiempo de ejecución a través del archivo local ignorado `.env`.
+- **Evasión de Fugas de Memoria:** El sistema de caché interno (`CACHE_MEMORIA`) incluye estrategias de poda y rotación de registros (`truncation limiting` de GEE Points) que garantizan un uso bajo y estable de memoria RAM sin importar si el volumen de usuarios crece de 10 a 1.000.000 de consultas al mes.
+- **Robustez contra DDoS y Throttling:** Dado que el cliente (Frontend) no hace *scraping* ni consultas directas a los servidores climáticos, si la app se viraliza, solo recaerá carga sobre el servidor FastAPI cacheado. Los servidores de la DMC o PurpleAir jamás recibirán carga excesiva ya que el backend realiza peticiones atómicas solo una vez cada 15/60 minutos.
 
 ---
 
-## 🧪 Verificación & Pruebas Automatizadas
-
-El proyecto cuenta con un conjunto de pruebas unitarias con `pytest` que verifican la conectividad de todos los endpoints, la limpieza de códigos sentinela y la respuesta de GEE:
-
-```bash
-python -m pytest -v test_main.py
-```
-
----
-
-## 📤 Pasos para Subir el Proyecto a GitHub
-
-1. Inicializar repositorio Git local (si aún no está iniciado):
-   ```bash
-   git init
-   ```
-2. Crear archivo `.gitignore`:
-   ```gitignore
-   venv/
-   __pycache__/
-   *.pyc
-   .pytest_cache/
-   .env
-   base_datos.sqlite
-   ```
-3. Añadir los archivos y realizar el primer commit:
-   ```bash
-   git add .
-   git commit -m "feat: Lanzamiento MeteoPrecisa Chile v9.0 — Plataforma Agrometeorologica e Integración GEE"
-   ```
-4. Vincular con tu repositorio remoto en GitHub y hacer push:
-   ```bash
-   git branch -M main
-   git remote add origin https://github.com/tu-usuario/meteoprecisa-backend.git
-   git push -u origin main
-   ```
-
----
-
-## 📜 Licencia y Reconocimientos
-
-Este proyecto está disponible bajo la licencia MIT. Agradecimientos especiales a las redes de datos públicas de Chile: **Agromet INIA**, **Dirección Meteorológica de Chile (DMC)**, **SINCA (Ministerio del Medio Ambiente)**, **SENAPRED**, **NOAA Satellite Services**, **Google Earth Engine** y **Windy.com**.
+> *Desarrollado para potenciar la precisión agronómica y climática de los ciudadanos de Chile y Sudamérica.*

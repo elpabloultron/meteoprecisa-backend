@@ -349,7 +349,11 @@ async def sincronizar_purpleair(client: httpx.AsyncClient) -> dict:
     print("🟣 [Sync Background] Consultando PurpleAir (Calidad del Aire Hiperlocal)...")
     purple_map = {}
     url = "https://api.purpleair.com/v1/sensors?fields=name,latitude,longitude,pm2.5_cf_1,pm10.0_cf_1,humidity,temperature,pressure&nwlng=-76&nwlat=-17&selng=-66&selat=-56"
-    api_key = "E7E65884-9135-11F1-9E30-4201AC1DC129"
+    # Usar variable de entorno para proteger la API Key en el repositorio público
+    api_key = os.getenv("PURPLEAIR_API_KEY")
+    if not api_key:
+        print("   ⚠️ No se encontró PURPLEAIR_API_KEY en las variables de entorno.")
+        return purple_map
     try:
         resp = await client.get(url, headers={"X-API-Key": api_key}, timeout=15.0)
         if resp.status_code == 200:
