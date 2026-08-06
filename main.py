@@ -9,6 +9,7 @@ import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 load_dotenv()
 
@@ -290,6 +291,28 @@ async def inspeccionar_ndvi_punto(
         "status": "ok",
         "analisis_earth_engine": res
     }
+
+@app.get("/api/v1/weather/historico")
+async def obtener_historico_clima(
+    lat: float = Query(..., description="Latitud"),
+    lon: float = Query(..., description="Longitud")
+):
+    from gee.rural import extraer_historico_ndvi
+    import asyncio
+    
+    try:
+        data = await asyncio.to_thread(extraer_historico_ndvi, lat, lon)
+        return {
+            "status": "ok",
+            "historico_ndvi_12_meses": data
+        }
+    except Exception as e:
+        return {"status": "error", "historico_ndvi_12_meses": []}
+
+@app.get("/api/v1/satellite/latest-loop")
+async def obtener_satellite_latest_loop_api():
+    from goes_processor import obtener_satellite_latest_loop
+    return obtener_satellite_latest_loop()
 
 @app.get("/api/v1/satelite-goes19")
 async def obtener_satelite_goes19(
