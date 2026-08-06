@@ -1,9 +1,9 @@
+import asyncio
+import io
+import logging
 import os
 import time
-import re
-import io
-import asyncio
-import logging
+
 import httpx
 from bs4 import BeautifulSoup
 from PIL import Image

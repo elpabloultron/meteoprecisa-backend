@@ -1,6 +1,9 @@
-import ee
 import math
+
+import ee
+
 from .core import GEECore
+
 
 def extraer_metricas_agricolas(lat: float, lon: float) -> dict:
     """Extrae métricas satelitales (Sentinel-2, ERA5, MODIS) orientadas a la agricultura."""

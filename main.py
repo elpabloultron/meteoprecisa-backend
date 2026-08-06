@@ -1,27 +1,27 @@
+import asyncio
+import math
+import os
+import time
+import unicodedata
+from contextlib import asynccontextmanager
+
+import httpx
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-import asyncio
-import httpx
-import math
-import time
-import re
-import unicodedata
-import os
-from dotenv import load_dotenv
 
 load_dotenv()
 
 
+import goes_processor
+from gee import obtener_capas_gee_y_windy
 from sincronizador_background import (
     CACHE_MEMORIA,
-    iniciar_loop_background,
+    cargar_cache_desde_disco,
     ejecutar_sincronizacion_completa,
-    cargar_cache_desde_disco
+    iniciar_loop_background,
 )
 
-from gee import obtener_capas_gee_y_windy
-import goes_processor
 
 def construir_transparency_metadata(last_up_ts: int, boletin_dmc: dict = None, est_info: dict = None) -> dict:
     now_ts = int(time.time())
@@ -81,7 +81,7 @@ app = FastAPI(
 )
 
 from fastapi.staticfiles import StaticFiles
-import os
+
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

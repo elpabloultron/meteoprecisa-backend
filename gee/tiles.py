@@ -1,5 +1,7 @@
 import ee
+
 from .core import GEECore
+
 
 def _create_tile_url(image_ee, vis_params: dict) -> str:
     """Helper genérico para obtener la URL del map ID en Earth Engine."""

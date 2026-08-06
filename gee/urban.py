@@ -1,6 +1,8 @@
+
 import ee
-import math
+
 from .core import GEECore
+
 
 def extraer_metricas_urbanas(lat: float, lon: float) -> dict:
     """Extrae métricas satelitales (Sentinel-5P, Landsat) orientadas a entornos urbanos."""

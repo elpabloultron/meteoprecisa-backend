@@ -1,17 +1,18 @@
 import asyncio
+import io
 import json
 import os
-import time
 import re
 import sys
-import io
-import httpx
-from bs4 import BeautifulSoup
+import time
 from datetime import datetime, timedelta
+
+import httpx
 from dotenv import load_dotenv
-from goes_processor import procesar_video_goes19
+
 from gee.rural import extraer_metricas_agricolas
 from gee.urban import extraer_metricas_urbanas
+from goes_processor import procesar_video_goes19
 
 load_dotenv()
 
@@ -443,7 +444,12 @@ async def sincronizar_puntos_gee():
     print("🌍 [Sync Background] Refrescando métricas satelitales (GEE)...")
     puntos = list(CACHE_MEMORIA.get("gee_puntos", {}).items())
     
-    for key, data in puntos[-50:]:  # Limitar a los últimos 50 solicitados
+    # Evitar memory leak limitando la caché histórica a 1000 puntos
+    if len(puntos) > 1000:
+        puntos = puntos[-1000:]
+        CACHE_MEMORIA["gee_puntos"] = dict(puntos)
+
+    for key, data in puntos[-50:]:  # Refrescar data sólo de los últimos 50 solicitados
         lat, lon = data["lat"], data["lon"]
         try:
             rural = await asyncio.to_thread(extraer_metricas_agricolas, lat, lon)
