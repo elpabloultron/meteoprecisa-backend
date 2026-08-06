@@ -10,8 +10,8 @@ export default function BottomNav({ activeTab, setActiveTab }) {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 block md:hidden bg-slate-950/90 backdrop-blur-xl border-t border-slate-800/80 mb-safe shadow-2xl">
-      <div className="flex items-center justify-around h-16 max-w-md mx-auto px-2">
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 block md:hidden w-[95%] max-w-sm mb-safe">
+      <div className="flex items-center justify-around h-16 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-3xl px-2 shadow-2xl">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;

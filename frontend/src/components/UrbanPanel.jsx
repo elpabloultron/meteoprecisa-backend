@@ -58,7 +58,7 @@ export default function UrbanPanel({ urbano, onSelectMetric, stationInfo, onOpen
       {/* CAJA DE ESTADO Y AUDITORÍA SINCA MMA */}
       <div
         onClick={() => onOpenAqi && onOpenAqi({ mp25: mp25Val, mp10: calidad_aire_sinca?.mediciones_base?.mp10_ug_m3 || null, aqi: aqiVal, norma: sincaNom })}
-        className={`p-4 rounded-xl border flex items-center justify-between gap-3 font-medium text-sm cursor-pointer transition hover:opacity-95 ${statusBg}`}
+        className={`glass-panel p-5 flex items-center justify-between gap-4 font-medium text-sm cursor-pointer transition hover:scale-[1.01] ${statusBg}`}
       >
         <div className="flex items-center gap-3">
           {statusIcon}
@@ -78,7 +78,7 @@ export default function UrbanPanel({ urbano, onSelectMetric, stationInfo, onOpen
         {/* TEMPERATURA */}
         <div
           onClick={() => handleCardClick("Temperatura Ambiente", temperatura_c, "°C", `Lectura de temperatura en aire a 2 metros del suelo. Sensación térmica: ${sensacion_termica_c}°C.`, "Mantener ventilación adecuada.", "Temperatura")}
-          className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2 cursor-pointer hover:border-sky-500/40 hover:bg-slate-850 transition group"
+          className="glass-panel p-5 space-y-3 cursor-pointer group hover:bg-sky-500/5 flex flex-col justify-between"
         >
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Temperatura</span>
@@ -91,7 +91,7 @@ export default function UrbanPanel({ urbano, onSelectMetric, stationInfo, onOpen
         {/* HUMEDAD RELATIVA */}
         <div
           onClick={() => handleCardClick("Humedad Relativa", humedad_relativa_porcentaje, "%", "Porcentaje de saturación de vapor de agua en el aire.", "Altas humedades aumentan la sensación de frío invernal.", "Humedad")}
-          className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2 cursor-pointer hover:border-sky-500/40 hover:bg-slate-850 transition group"
+          className="glass-panel p-5 space-y-3 cursor-pointer group hover:bg-sky-500/5 flex flex-col justify-between"
         >
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Humedad</span>
@@ -104,7 +104,7 @@ export default function UrbanPanel({ urbano, onSelectMetric, stationInfo, onOpen
         {/* VIENTO */}
         <div
           onClick={() => handleCardClick("Velocidad y Dirección del Viento", viento_velocidad_kmh, "km/h", `Viento sostenido con dirección proveniente del ${viento_direccion}.`, "Vientos sostenidos superiores a 40 km/h requieren precaución en estructuras livianas.", "Viento")}
-          className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2 cursor-pointer hover:border-sky-500/40 hover:bg-slate-850 transition group"
+          className="glass-panel p-5 space-y-3 cursor-pointer group hover:bg-sky-500/5 flex flex-col justify-between"
         >
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Viento</span>
@@ -117,7 +117,7 @@ export default function UrbanPanel({ urbano, onSelectMetric, stationInfo, onOpen
         {/* ÍNDICE UV */}
         <div
           onClick={() => handleCardClick("Índice de Radiación UV", indice_uv, "UV", "Medición de radiación ultravioleta máxima estimada para el día.", "Usar bloqueador solar FPS 50+ durante horas centrales.", "Radiación")}
-          className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2 cursor-pointer hover:border-sky-500/40 hover:bg-slate-850 transition group"
+          className="glass-panel p-5 space-y-3 cursor-pointer group hover:bg-sky-500/5 flex flex-col justify-between"
         >
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Índice UV</span>
@@ -130,7 +130,7 @@ export default function UrbanPanel({ urbano, onSelectMetric, stationInfo, onOpen
         {/* CALIDAD DEL AIRE SINCA */}
         <div
           onClick={() => onOpenAqi && onOpenAqi({ mp25: mp25Val, mp10: calidad_aire_sinca?.mediciones_base?.mp10_ug_m3 || null, aqi: aqiVal, norma: sincaNom })}
-          className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2 cursor-pointer hover:border-sky-500/40 hover:bg-slate-850 transition group"
+          className="glass-panel p-5 space-y-3 cursor-pointer group hover:bg-sky-500/5 flex flex-col justify-between"
         >
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Norma MMA</span>
@@ -143,7 +143,7 @@ export default function UrbanPanel({ urbano, onSelectMetric, stationInfo, onOpen
         {/* PRESIÓN ATMOSFÉRICA */}
         <div
           onClick={() => handleCardClick("Presión Atmosférica", presion_hpa, "hPa", "Presión barométrica reducida al nivel del mar.", "Altas presiones sostenidas indican estabilidad atmosférica e inversión térmica.", "Presión")}
-          className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-2 cursor-pointer hover:border-sky-500/40 hover:bg-slate-850 transition group"
+          className="glass-panel p-5 space-y-3 cursor-pointer group hover:bg-sky-500/5 flex flex-col justify-between"
         >
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Presión</span>

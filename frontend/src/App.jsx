@@ -80,7 +80,8 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#080c14] text-slate-100 flex flex-col font-sans selection:bg-sky-500 selection:text-slate-950">
+    <div className={`theme-wrapper ${modo === 'agricola' ? 'theme-agricola' : 'theme-urbano'}`}>
+      <div className="min-h-screen text-slate-100 flex flex-col font-sans selection:bg-sky-500 selection:text-slate-950">
       
       {/* NAVBAR NAVEGACIÓN PRINCIPAL */}
       <Navbar
@@ -218,6 +219,7 @@ export default function App() {
         setActiveTab={handleTabChange}
       />
 
+    </div>
     </div>
   );
 }

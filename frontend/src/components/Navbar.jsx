@@ -31,7 +31,7 @@ export default function Navbar({ modo, setModo, onSelectStation, apiBase }) {
   }, [query, apiBase]);
 
   return (
-    <header className="sticky top-0 z-50 bg-slate-950/85 border-b border-slate-800/80 backdrop-blur-2xl px-4 py-3 shadow-2xl pt-safe">
+    <header className="sticky top-0 z-50 bg-slate-900/40 border-b border-white/10 backdrop-blur-2xl px-4 py-3 shadow-2xl pt-safe transition-colors duration-700">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
         
         {/* TITULAR Y MARCA */}
@@ -69,7 +69,7 @@ export default function Navbar({ modo, setModo, onSelectStation, apiBase }) {
               placeholder="Buscar ciudad o comuna de Chile..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-800 bg-slate-900/90 rounded-2xl text-xs text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition duration-200 shadow-inner"
+              className="w-full pl-10 pr-4 py-2 border border-white/10 bg-black/20 backdrop-blur-lg rounded-2xl text-xs text-slate-100 placeholder-slate-400 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 outline-none transition-all duration-300 shadow-inner"
             />
           </div>
 
@@ -100,7 +100,7 @@ export default function Navbar({ modo, setModo, onSelectStation, apiBase }) {
         </div>
 
         {/* SELECTOR DE MODOS CON PILLS DE NAVEGACIÓN */}
-        <div className="flex items-center p-1 bg-slate-900/90 border border-slate-800 rounded-2xl w-full md:w-auto justify-center">
+        <div className="flex items-center p-1 bg-black/30 backdrop-blur-md border border-white/10 rounded-2xl w-full md:w-auto justify-center shadow-inner">
           <button
             type="button"
             onClick={() => setModo('urbano')}

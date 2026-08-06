@@ -49,7 +49,7 @@ export default function WeatherHeader({ climaData, onOpenEstacionesCercanas }) {
       )}
 
       {/* HERO CARD ESTILO APPLE WEATHER CON BOTÓN COMPARTIR Y VER ESTACIONES CERCANAS */}
-      <div className="relative rounded-3xl p-6 md:p-8 bg-gradient-to-b from-slate-900/90 via-slate-900/70 to-slate-950/90 border border-slate-800/80 shadow-2xl backdrop-blur-2xl overflow-hidden text-center space-y-3">
+      <div className="glass-panel relative p-8 md:p-12 overflow-hidden text-center space-y-6">
         {/* Radial ambient glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -78,16 +78,16 @@ export default function WeatherHeader({ climaData, onOpenEstacionesCercanas }) {
         </h1>
 
         {/* TEMPERATURA GIGANTE ESTILO APPLE WEATHER */}
-        <div className="py-2 relative z-10 flex flex-col items-center justify-center">
-          <div className="text-7xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-100 to-slate-300 font-mono tracking-tighter drop-shadow-md">
+        <div className="py-4 relative z-10 flex flex-col items-center justify-center transition-transform hover:scale-105 duration-500">
+          <div className="text-8xl md:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-white/40 font-mono tracking-tighter drop-shadow-2xl">
             {temp}°
           </div>
-          <div className="text-sm font-semibold text-slate-300 flex items-center justify-center gap-3 mt-1">
-            <span>Sensación: <strong className="text-sky-300">{sensacion}°C</strong></span>
-            <span className="text-slate-600">•</span>
-            <span>Mín: <strong className="text-cyan-300">{tMin}°C</strong></span>
-            <span className="text-slate-600">•</span>
-            <span>Máx: <strong className="text-amber-300">{tMax}°C</strong></span>
+          <div className="text-sm font-semibold text-slate-300 flex items-center justify-center gap-4 mt-4 bg-black/20 px-6 py-2 rounded-full backdrop-blur-md border border-white/5">
+            <span>Sensación <strong className="text-sky-300 ml-1">{sensacion}°</strong></span>
+            <span className="text-white/20">|</span>
+            <span>Mín <strong className="text-cyan-300 ml-1">{tMin}°</strong></span>
+            <span className="text-white/20">|</span>
+            <span>Máx <strong className="text-amber-300 ml-1">{tMax}°</strong></span>
           </div>
         </div>
 
