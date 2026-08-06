@@ -29,10 +29,26 @@ GOES_CACHE_METADATA = {
 }
 
 
+async def _descargar_y_procesar_frame(client, url, semaphore):
+    async with semaphore:
+        try:
+            resp = await client.get(url, timeout=15.0)
+            if resp.status_code == 200:
+                def procesar_img(img_bytes):
+                    img = Image.open(io.BytesIO(img_bytes))
+                    # Usar resize explícito en lugar de thumbnail para garantizar que 
+                    # todos los frames tengan exactamente 480x288 y no falle el codificador WebP
+                    img = img.resize((480, 288), Image.Resampling.LANCZOS)
+                    return img
+                return await asyncio.to_thread(procesar_img, resp.content)
+        except Exception as e:
+            logger.warning(f"Error en frame {url}: {e}")
+    return None
+
 async def procesar_video_goes19(max_frames: int = 144) -> dict:
     """
     Descarga los últimos fotogramas de la NOAA para Chile (GOES-19 SSA),
-    los compila en un archivo WebP animado ultra liviano y lo guarda en static/goes19_loop.webp.
+    los compila concurrentemente en un WebP ultra liviano y lo guarda en static/goes19_loop.webp.
     """
     global GOES_CACHE_METADATA
     url_base = "https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/GEOCOLOR/"
@@ -57,30 +73,28 @@ async def procesar_video_goes19(max_frames: int = 144) -> dict:
                     frames_urls = [f"{url_base}{f}" for f in archivos_ordenados if f.startswith("202")][-max_frames:]
 
                 if frames_urls:
-                    logger.info(f"📥 Descargando {len(frames_urls)} fotogramas para animación WebP...")
-                    images = []
-                    for frame_url in frames_urls:
-                        try:
-                            img_resp = await client.get(frame_url)
-                            if img_resp.status_code == 200:
-                                img = Image.open(io.BytesIO(img_resp.content))
-                                # Redimensionar para garantizar reproducción fluida (< 3MB WebP para 144 frames)
-                                img.thumbnail((480, 288))
-                                images.append(img)
-                        except Exception as e_img:
-                            logger.warning(f"Error descargando fotograma {frame_url}: {e_img}")
+                    logger.info(f"📥 Descargando {len(frames_urls)} fotogramas concurrentemente para animación WebP...")
+                    semaphore = asyncio.Semaphore(10)
+                    tasks = [_descargar_y_procesar_frame(client, url, semaphore) for url in frames_urls]
+                    
+                    results = await asyncio.gather(*tasks, return_exceptions=True)
+                    images = [res for res in results if res is not None and not isinstance(res, Exception)]
 
                     if images:
-                        # Guardar animación WebP en static/goes19_loop.webp
-                        images[0].save(
-                            WEBP_OUTPUT_PATH,
-                            format="WEBP",
-                            save_all=True,
-                            append_images=images[1:],
-                            duration=50,  # 20 fps para animación suave (aprox 7s para 24h)
-                            loop=0,
-                            quality=80
-                        )
+                        def guardar_webp(imgs):
+                            imgs[0].save(
+                                WEBP_OUTPUT_PATH,
+                                format="WEBP",
+                                save_all=True,
+                                append_images=imgs[1:],
+                                duration=50,  # 20 fps
+                                loop=0,
+                                quality=80
+                            )
+                        
+                        logger.info("⏳ Compilando animación WebP en hilos de fondo...")
+                        await asyncio.to_thread(guardar_webp, images)
+                        
                         now_ts = int(time.time())
                         time_label = time.strftime("%H:%M")
                         
@@ -94,7 +108,7 @@ async def procesar_video_goes19(max_frames: int = 144) -> dict:
                             "raw_source_url": url_base,
                             "is_live_data": True
                         }
-                        logger.info(f"✅ Animación WebP GOES-19 generada exitosamente ({len(images)} fotogramas en static/goes19_loop.webp)")
+                        logger.info(f"✅ Animación WebP GOES-19 generada exitosamente ({len(images)} fotogramas)")
                         return GOES_CACHE_METADATA
 
     except Exception as e:

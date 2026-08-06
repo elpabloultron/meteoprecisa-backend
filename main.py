@@ -80,6 +80,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+from fastapi.staticfiles import StaticFiles
+import os
+os.makedirs("static", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -91,9 +96,6 @@ app.add_middleware(
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0 Safari/537.36"
 }
-
-from fastapi.responses import RedirectResponse
-
 
 
 def quitar_tildes(texto: str) -> str:
@@ -406,7 +408,7 @@ async def obtener_clima_hiperlocal(
     # Calidad de aire SINCA
     sinca_map = CACHE_MEMORIA.get("calidad_aire_sinca", {})
     sinca_info = None
-    for s_id, s_data in sinca_map.items():
+    for _, s_data in sinca_map.items():
         sinca_info = s_data
         break
 

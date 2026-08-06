@@ -2,7 +2,7 @@ import React, { createContext, useState, useEffect } from 'react';
 
 export const WeatherContext = createContext();
 
-export const API_BASE = import.meta.env.VITE_API_URL || '';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export function WeatherProvider({ children }) {
   const [modo, setModo] = useState('urbano');

@@ -94,53 +94,6 @@ def cargar_catalogo_maestro() -> list[dict]:
             print(f"⚠️ Error cargando catálogo maestro: {e}")
     return []
 
-async def sincronizar_satelite_goes19(client: httpx.AsyncClient) -> dict:
-    url_base = "https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/GEOCOLOR/"
-    print("🛰️ [Sync Background] Consultando satélite GOES-19 NOAA (Sector Chile SSA - 24H)...")
-    try:
-        resp = await client.get(url_base, timeout=15.0)
-        if resp.status_code == 200:
-            soup = BeautifulSoup(resp.text, "html.parser")
-            archivos = set()
-            for a in soup.find_all('a', href=True):
-                href = a['href']
-                if href.endswith('.jpg') and not href.startswith('latest') and 'thumbnail' not in href:
-                    archivos.add(href)
-            
-            archivos_ordenados = sorted(list(archivos))
-            
-            # Extraer hasta 144 fotogramas para animación de 24 horas continuas sobre Chile (SSA)
-            frames_1800 = [f"{url_base}{f}" for f in archivos_ordenados if "1800x1080" in f and f.startswith("202")][-144:]
-            frames_900 = [f"{url_base}{f}" for f in archivos_ordenados if "900x540" in f and f.startswith("202")][-144:]
-            frames_450 = [f"{url_base}{f}" for f in archivos_ordenados if "450x270" in f and f.startswith("202")][-144:]
-            
-            frames_validos = frames_900 or frames_1800 or frames_450
-            
-            if frames_validos:
-                print(f"   ✅ Satélite GOES-19 procesado ({len(frames_validos)} fotogramas listos para animación fluida sobre Chile)")
-                return {
-                    "frames_1800x1080": frames_1800 or frames_validos,
-                    "frames_900x540": frames_900 or frames_validos,
-                    "frames_450x270": frames_450 or frames_validos,
-                    "total": len(frames_validos),
-                    "fps_recomendado": 10,
-                    "intervalo_ms": 100,
-                    "ventana_horas": 24
-                }
-    except Exception as e:
-        print(f"   ⚠️ Error en consulta satelital GOES-19 SSA: {e}")
-    
-    fallback_url = "https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/GEOCOLOR/1800x1080.jpg"
-    return {
-        "frames_1800x1080": [fallback_url],
-        "frames_900x540": [fallback_url],
-        "frames_450x270": [fallback_url],
-        "total": 1,
-        "fps_recomendado": 10,
-        "intervalo_ms": 100,
-        "ventana_horas": 1
-    }
-
 async def sincronizar_dmc_telemetria(client: httpx.AsyncClient) -> tuple[dict, list[dict]]:
     url = f"https://climatologia.meteochile.gob.cl/application/servicios/getDatosRecientesRedEma?usuario={USUARIO_DMC}&token={TOKEN_DMC}"
     print("✈️ [Sync Background] Consultando telemetría oficial DMC...")
@@ -540,8 +493,7 @@ async def ejecutar_sincronizacion_completa():
         # Lanzar generación de bucle WebP GOES-19 asíncronamente
         asyncio.create_task(procesar_video_goes19())
         
-        sat_data, (dmc_tele, dmc_cat), (agromet_tele, agromet_cat), (redmeteo_tele, redmeteo_cat), sinca_data, dmc_boletin, senapred_data, _ = await asyncio.gather(
-            sincronizar_satelite_goes19(client),
+        (dmc_tele, dmc_cat), (agromet_tele, agromet_cat), (redmeteo_tele, redmeteo_cat), sinca_data, dmc_boletin, senapred_data, _ = await asyncio.gather(
             sincronizar_dmc_telemetria(client),
             sincronizar_agromet_inia(client),
             sincronizar_redmeteo(client),
@@ -553,8 +505,6 @@ async def ejecutar_sincronizacion_completa():
         )
 
     
-    if isinstance(sat_data, dict):
-        CACHE_MEMORIA["satelite_goes19"] = sat_data
     if isinstance(sinca_data, dict):
         CACHE_MEMORIA["calidad_aire_sinca"] = sinca_data
     if isinstance(dmc_boletin, dict):
