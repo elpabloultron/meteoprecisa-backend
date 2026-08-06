@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useContext } from 'react';
+import { WeatherContext } from './context/WeatherContext';
 import Navbar from './components/Navbar';
 import WeatherHeader from './components/WeatherHeader';
 import HourlyCarousel from './components/HourlyCarousel';
@@ -16,18 +17,19 @@ import HourlyForecastDrawer from './components/HourlyForecastDrawer';
 import EstacionesCercanasModal from './components/EstacionesCercanasModal';
 import LocationFallbackModal from './components/LocationFallbackModal';
 
-const API_BASE = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? 'http://localhost:8000'
-  : '';
-
 export default function App() {
-  const [modo, setModo] = useState('urbano');
-  const [coords, setCoords] = useState({ lat: -33.4450, lon: -70.6830 });
-  const [climaData, setClimaData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const {
+    modo, setModo,
+    coords, setCoords,
+    climaData,
+    loading,
+    gpsFallbackOpen, setGpsFallbackOpen,
+    handleSelectStation,
+    API_BASE
+  } = useContext(WeatherContext);
+
   const [sateliteModalOpen, setSateliteModalOpen] = useState(false);
   const [cercanasModalOpen, setCercanasModalOpen] = useState(false);
-  const [gpsFallbackOpen, setGpsFallbackOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('inicio');
 
   // Estado para el DetailDrawer de métricas y auditoría
@@ -44,36 +46,6 @@ export default function App() {
 
   const mapRef = useRef(null);
   const forecastRef = useRef(null);
-
-  // Obtener geolocalización GPS del usuario al iniciar
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude });
-        },
-        (err) => {
-          console.log("Geolocalización predeterminada (Santiago):", err);
-          setGpsFallbackOpen(true);
-        },
-        { timeout: 8000, enableHighAccuracy: true }
-      );
-    } else {
-      setGpsFallbackOpen(true);
-    }
-  }, []);
-
-  // Consultar clima hiperlocal en vivo
-  useEffect(() => {
-    setLoading(true);
-    fetch(`${API_BASE}/api/v1/clima-hiperlocal?lat=${coords.lat}&lon=${coords.lon}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setClimaData(data);
-      })
-      .catch((err) => console.error("Error consultando clima:", err))
-      .finally(() => setLoading(false));
-  }, [coords]);
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);

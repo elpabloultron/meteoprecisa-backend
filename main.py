@@ -96,16 +96,9 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0 Safari/537.36"
 }
 
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse, FileResponse
+from fastapi.responses import RedirectResponse
 
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
-FRONTEND_DIST_DIR = os.path.join(os.path.dirname(__file__), "frontend", "dist")
 
-SERVE_DIR = FRONTEND_DIST_DIR if os.path.exists(os.path.join(FRONTEND_DIST_DIR, "index.html")) else STATIC_DIR
-
-if os.path.exists(SERVE_DIR):
-    app.mount("/static", StaticFiles(directory=SERVE_DIR), name="static")
 
 def quitar_tildes(texto: str) -> str:
     if not texto:
@@ -253,25 +246,7 @@ def home():
         "total_estaciones_registradas": len(CACHE_MEMORIA.get("catalogo_estaciones", []))
     }
 
-@app.get("/")
-@app.get("/app")
-@app.get("/app/")
-@app.get("/index.html")
-async def app_frontend():
-    index_path = os.path.join(SERVE_DIR, "index.html")
-    if not os.path.exists(index_path):
-        index_path = os.path.join(STATIC_DIR, "index.html")
 
-    if os.path.exists(index_path):
-        return FileResponse(
-            index_path,
-            headers={
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma": "no-cache",
-                "Expires": "0"
-            }
-        )
-    return {"status": "online", "message": "MeteoPrecisa Engine"}
 
 
 
