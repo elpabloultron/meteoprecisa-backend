@@ -184,6 +184,7 @@ export default function App() {
         onClose={() => setCercanasModalOpen(false)}
         onSelectStation={handleSelectStation}
         apiBase={API_BASE}
+        estacionActual={climaData?.estacion}
       />
 
       {/* DRAWER DESPLEGABLE DE MÉTRICAS Y AUDITORÍA DE FUENTE */}

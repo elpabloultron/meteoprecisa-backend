@@ -125,12 +125,12 @@ async def sincronizar_dmc_telemetria(client: httpx.AsyncClient) -> tuple[dict, l
                         "nombre": f"Estación DMC {nombre}",
                         "lat": lat,
                         "lon": lon,
-                        "temperatura_c": clean_num(ultimo.get("temperatura")) or 0.0,
-                        "punto_rocio_c": clean_num(ultimo.get("puntoDeRocio")) or 0.0,
-                        "humedad_relativa": int(clean_num(ultimo.get("humedadRelativa")) or 0),
+                        "temperatura_c": clean_num(ultimo.get("temperatura")),
+                        "punto_rocio_c": clean_num(ultimo.get("puntoDeRocio")),
+                        "humedad_relativa": int(clean_num(ultimo.get("humedadRelativa")) or 0) if clean_num(ultimo.get("humedadRelativa")) is not None else None,
                         "viento_kmh": vkmh,
                         "direccion_viento_grados": int(dir_v),
-                        "lluvia_acumulada_hoy_mm": clean_num(ultimo.get("aguaCaida6Horas")) or 0.0,
+                        "lluvia_acumulada_hoy_mm": clean_num(ultimo.get("aguaCaida6Horas")),
                         "timestamp_actualizacion": int(time.time())
                     }
 
@@ -183,7 +183,7 @@ async def sincronizar_agromet_inia(client: httpx.AsyncClient) -> tuple[dict, lis
                     if vv is not None and (vv > 150.0 or vv < 0): vv = 2.0
                     if rain is not None and (rain > 300.0 or rain < 0): rain = 0.0
 
-                    temp_est = round((t_min + t_max) / 2.0, 1) if (t_min is not None and t_max is not None) else 14.5
+                    temp_est = round((t_min + t_max) / 2.0, 1) if (t_min is not None and t_max is not None) else None
 
                     telemetria_map[est_id] = {
                         "id": est_id,
@@ -191,11 +191,11 @@ async def sincronizar_agromet_inia(client: httpx.AsyncClient) -> tuple[dict, lis
                         "lat": lat,
                         "lon": lon,
                         "temperatura_c": temp_est,
-                        "temperatura_min_hoy_c": t_min if t_min is not None else 8.0,
-                        "temperatura_max_hoy_c": t_max if t_max is not None else 18.0,
-                        "humedad_relativa": int(hr) if hr is not None else 65,
-                        "viento_kmh": round(vv * 3.6, 1) if vv is not None else 5.0,
-                        "lluvia_acumulada_hoy_mm": rain if rain is not None else 0.0,
+                        "temperatura_min_hoy_c": t_min,
+                        "temperatura_max_hoy_c": t_max,
+                        "humedad_relativa": int(hr) if hr is not None else None,
+                        "viento_kmh": round(vv * 3.6, 1) if vv is not None else None,
+                        "lluvia_acumulada_hoy_mm": rain,
                         "timestamp_actualizacion": int(time.time())
                     }
 
@@ -237,14 +237,14 @@ async def sincronizar_redmeteo(client: httpx.AsyncClient) -> tuple[dict, list[di
                         "nombre": f"Estación RedMeteo {nombre}",
                         "lat": float(lat),
                         "lon": float(lon),
-                        "temperatura_c": clean_num(item.get("temperatura")) or 0.0,
-                        "humedad_relativa": int(clean_num(item.get("humedad")) or 0),
-                        "viento_kmh": clean_num(item.get("velocidad_viento")) or 0.0,
+                        "temperatura_c": clean_num(item.get("temperatura")),
+                        "humedad_relativa": int(clean_num(item.get("humedad")) or 0) if clean_num(item.get("humedad")) is not None else None,
+                        "viento_kmh": clean_num(item.get("velocidad_viento")),
                         "direccion_viento_grados": int(clean_num(item.get("direccion_viento")) or 0),
-                        "punto_rocio_c": clean_num(item.get("punto_rocio")) or 0.0,
-                        "presion_hpa": clean_num(item.get("presion_absoluta")) or 1013.25,
-                        "radiacion_w_m2": clean_num(item.get("radiacion_solar")) or 0.0,
-                        "lluvia_mm": clean_num(item.get("lluviadiaria")) or 0.0,
+                        "punto_rocio_c": clean_num(item.get("punto_rocio")),
+                        "presion_hpa": clean_num(item.get("presion_absoluta")),
+                        "radiacion_w_m2": clean_num(item.get("radiacion_solar")),
+                        "lluvia_mm": clean_num(item.get("lluviadiaria")),
                         "timestamp_actualizacion": int(time.time())
                     }
 
@@ -485,13 +485,13 @@ async def ejecutar_sincronizacion_completa():
         catalogo_final.append(est)
         ids_registrados.add(est["id"])
 
-    telemetria_global = {}
+    telemetria_global = CACHE_MEMORIA.get("estaciones_telemetria", {}).copy()
 
     async with httpx.AsyncClient(headers=HEADERS, follow_redirects=True, verify=False) as client:
         # Lanzar generación de bucle WebP GOES-19 asíncronamente
         asyncio.create_task(procesar_video_goes19())
         
-        (dmc_tele, dmc_cat), (agromet_tele, agromet_cat), (redmeteo_tele, redmeteo_cat), sinca_data, purpleair_data, dmc_boletin, senapred_data, _ = await asyncio.gather(
+        results = await asyncio.gather(
             sincronizar_dmc_telemetria(client),
             sincronizar_agromet_inia(client),
             sincronizar_redmeteo(client),
@@ -502,6 +502,18 @@ async def ejecutar_sincronizacion_completa():
             sincronizar_puntos_gee(),
             return_exceptions=True
         )
+
+        def get_res(idx, default):
+            res = results[idx]
+            return default if isinstance(res, Exception) else res
+
+        dmc_tele, dmc_cat = get_res(0, ({}, []))
+        agromet_tele, agromet_cat = get_res(1, ({}, []))
+        redmeteo_tele, redmeteo_cat = get_res(2, ({}, []))
+        sinca_data = get_res(3, {})
+        purpleair_data = get_res(4, {})
+        dmc_boletin = get_res(5, {})
+        senapred_data = get_res(6, [])
 
     
     if isinstance(sinca_data, dict):
