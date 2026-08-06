@@ -20,11 +20,7 @@ from sincronizador_background import (
     cargar_cache_desde_disco
 )
 
-from gee_engine import (
-    obtener_capas_gee_y_windy,
-    obtener_ndvi_y_humedad_punto
-)
-import gee_service
+from gee import obtener_capas_gee_y_windy
 import goes_processor
 
 def construir_transparency_metadata(last_up_ts: int, boletin_dmc: dict = None, est_info: dict = None) -> dict:
@@ -134,6 +130,29 @@ def evaluar_inversion_termica(temp_c: float, viento_kmh: float, humedad: float) 
         return {"nivel": "Moderada 🟡", "color": "#f59e0b", "desc": "Capa de ventilación reducida en el valle"}
     else:
         return {"nivel": "Baja 🟢", "color": "#10b981", "desc": "Buena dispersión atmosférica"}
+
+def obtener_gee_punto_seguro(lat: float, lon: float) -> dict:
+    key = f"{round(lat, 3)},{round(lon, 3)}"
+    cache_gee = CACHE_MEMORIA.get("gee_puntos", {})
+    if key in cache_gee:
+        return cache_gee[key]
+    else:
+        # Fallback rápido para no bloquear FastAPI. Se actualizará en background.
+        from gee.rural import fallback_rural
+        from gee.urban import fallback_urbano
+        rural = fallback_rural(lat, lon)
+        urban = fallback_urbano(lat, lon)
+        nuevo_pto = {
+            "lat": lat,
+            "lon": lon,
+            "rural": rural,
+            "urban": urban,
+            "timestamp": int(time.time())
+        }
+        # Inyectar en caché para que el background worker lo pille
+        CACHE_MEMORIA["gee_puntos"][key] = nuevo_pto
+        return nuevo_pto
+
 
 def calcular_calidad_aire_dual(pm25_val: float | None, pm10_val: float | None) -> dict:
     val_mp25 = pm25_val if (pm25_val is not None and not math.isnan(pm25_val)) else 15.0
@@ -264,7 +283,7 @@ async def inspeccionar_ndvi_punto(
     lat: float = Query(..., description="Latitud GPS"),
     lon: float = Query(..., description="Longitud GPS")
 ):
-    res = obtener_ndvi_y_humedad_punto(lat, lon)
+    res = obtener_gee_punto_seguro(lat, lon)
     return {
         "status": "ok",
         "analisis_earth_engine": res
@@ -445,6 +464,8 @@ async def obtener_clima_hiperlocal(
 
     inversion_eval = evaluar_inversion_termica(temp_final, viento_final, humedad_final)
 
+    gee_punto = obtener_gee_punto_seguro(lat, lon)
+
     # 1. MODULO URBANO
     modo_urbano = {
         "temperatura_c": round(float(temp_final), 1),
@@ -458,7 +479,13 @@ async def obtener_clima_hiperlocal(
         "calidad_aire_sinca": calidad_aire_eval,
         "calidad_aire_sinca_y_aqi": calidad_aire_eval,
         "salida_sol": sunrise_val,
-        "puesta_sol": sunset_val
+        "puesta_sol": sunset_val,
+        "calidad_aire_no2_satelital": gee_punto["urban"]["calidad_aire_no2_satelital"],
+        "estado_no2_urbano": gee_punto["urban"]["estado_no2_urbano"],
+        "temperatura_superficie_suelo_lst_c": gee_punto["urban"]["temperatura_superficie_suelo_lst_c"],
+        "estado_temperatura_suelo": gee_punto["urban"]["estado_temperatura_suelo"],
+        "focos_calor_firms": gee_punto["urban"]["focos_calor_firms"],
+        "estado_firms_incendios": gee_punto["urban"]["estado_firms_incendios"]
     }
 
     # 2. MODULO AGRÍCOLA
@@ -467,9 +494,6 @@ async def obtener_clima_hiperlocal(
         "riesgo_helada": "Alto ❄️" if punto_rocio <= 0.0 or temp_final <= 2.0 else "Bajo 🟢",
         "temperatura_rocio_c": round(float(punto_rocio), 1)
     }
-
-    # Obtener NDVI y humedad de suelo de Google Earth Engine
-    gee_punto = obtener_ndvi_y_humedad_punto(lat, lon)
 
     precip_hoy = telemetria_directa.get("lluvia_acumulada_hoy_mm") if telemetria_directa.get("lluvia_acumulada_hoy_mm") is not None else curr_om.get("precipitation", 0.0)
     if precip_hoy is None or precip_hoy > 300.0:
@@ -481,10 +505,14 @@ async def obtener_clima_hiperlocal(
         "evapotranspiracion_eto_mm_dia": round(float(eto_val), 1),
         "horas_frio_acumuladas_24h": horas_frio_totales,
         "alerta_helada_agrometeorologica": alerta_helada,
-        "salud_vegetacion_ndvi": gee_punto.get("ndvi_salud_vegetal"),
-        "estado_vigor_vegetativo": gee_punto.get("estado_vigor"),
-        "humedad_suelo_volumetrica": gee_punto.get("humedad_suelo_volumetrica"),
-        "estado_humedad_suelo": gee_punto.get("estado_humedad_suelo"),
+        "salud_vegetacion_ndvi": gee_punto["rural"]["salud_vegetacion_ndvi"],
+        "estado_vigor_vegetativo": gee_punto["rural"]["estado_vigor_vegetativo"],
+        "estres_hidrico_ndwi": gee_punto["rural"]["estres_hidrico_ndwi"],
+        "estado_estres_hidrico": gee_punto["rural"]["estado_estres_hidrico"],
+        "humedad_suelo_volumetrica": gee_punto["rural"]["humedad_suelo_volumetrica"],
+        "estado_humedad_suelo": gee_punto["rural"]["estado_humedad_suelo"],
+        "indice_biomasa_evi": gee_punto["rural"]["indice_biomasa_evi"],
+        "evapotranspiracion_real_mod16_mm_dia": gee_punto["rural"]["evapotranspiracion_real_mod16_mm_dia"],
         "radiacion_solar_w_m2": round(float(telemetria_directa.get("radiacion_w_m2", 250.0)), 1),
         "rafagas_viento_kmh": round(float(curr_om.get("wind_gusts_10m", viento_final * 1.3)), 1),
         "lluvia_caida_hoy_mm": round(float(precip_hoy), 1),
@@ -493,7 +521,7 @@ async def obtener_clima_hiperlocal(
         "lluvia_acumulada_mes_mm": round(float(precip_hoy + 38.5), 1),
         "temperatura_minima_hoy_c": round(float(daily_om.get("temperature_2m_min", [temp_final])[0]), 1),
         "temperatura_maxima_hoy_c": round(float(daily_om.get("temperature_2m_max", [temp_final])[0]), 1),
-        "fuente_agronomica": gee_punto.get("fuente")
+        "fuente_agronomica": gee_punto["rural"]["fuente_rural"]
     }
 
     # Boletín Oficial DMC

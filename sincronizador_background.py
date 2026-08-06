@@ -10,6 +10,8 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from goes_processor import procesar_video_goes19
+from gee.rural import extraer_metricas_agricolas
+from gee.urban import extraer_metricas_urbanas
 
 load_dotenv()
 
@@ -45,7 +47,8 @@ CACHE_MEMORIA = {
     "calidad_aire_sinca": {},
     "pronostico_oficial_dmc": {},
     "alertas_senapred": [],
-    "catalogo_estaciones": []
+    "catalogo_estaciones": [],
+    "gee_puntos": {}
 }
 
 def clean_num(v):
@@ -495,6 +498,27 @@ async def sincronizar_alertas_senapred(client: httpx.AsyncClient) -> list[dict]:
     print(f"   ✅ SENAPRED procesado ({len(alertas)} alertas registradas)")
     return alertas
 
+async def sincronizar_puntos_gee():
+    print("🌍 [Sync Background] Refrescando métricas satelitales (GEE)...")
+    puntos = list(CACHE_MEMORIA.get("gee_puntos", {}).items())
+    
+    for key, data in puntos[-50:]:  # Limitar a los últimos 50 solicitados
+        lat, lon = data["lat"], data["lon"]
+        try:
+            rural = await asyncio.to_thread(extraer_metricas_agricolas, lat, lon)
+            urban = await asyncio.to_thread(extraer_metricas_urbanas, lat, lon)
+            CACHE_MEMORIA["gee_puntos"][key] = {
+                "lat": lat,
+                "lon": lon,
+                "rural": rural,
+                "urban": urban,
+                "timestamp": int(time.time())
+            }
+        except Exception as e:
+            print(f"⚠️ Error actualizando GEE point {key}: {e}")
+    if puntos:
+        print(f"   ✅ GEE actualizado ({len(puntos[:50])} puntos cacheados)")
+
 async def ejecutar_sincronizacion_completa():
     global CACHE_MEMORIA
     CACHE_MEMORIA["status"] = "syncing"
@@ -516,7 +540,7 @@ async def ejecutar_sincronizacion_completa():
         # Lanzar generación de bucle WebP GOES-19 asíncronamente
         asyncio.create_task(procesar_video_goes19())
         
-        sat_data, (dmc_tele, dmc_cat), (agromet_tele, agromet_cat), (redmeteo_tele, redmeteo_cat), sinca_data, dmc_boletin, senapred_data = await asyncio.gather(
+        sat_data, (dmc_tele, dmc_cat), (agromet_tele, agromet_cat), (redmeteo_tele, redmeteo_cat), sinca_data, dmc_boletin, senapred_data, _ = await asyncio.gather(
             sincronizar_satelite_goes19(client),
             sincronizar_dmc_telemetria(client),
             sincronizar_agromet_inia(client),
@@ -524,6 +548,7 @@ async def ejecutar_sincronizacion_completa():
             sincronizar_calidad_aire_sinca(),
             sincronizar_pronostico_oficial_dmc(client),
             sincronizar_alertas_senapred(client),
+            sincronizar_puntos_gee(),
             return_exceptions=True
         )
 

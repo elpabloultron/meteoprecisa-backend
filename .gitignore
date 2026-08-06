@@ -5,6 +5,8 @@ ENV/
 
 # Archivos de credenciales y llaves privadas de Google / APIs
 llave-google.json.json
+llave-google.json
+credentials.json
 *.json.json
 service_account*.json
 .env
